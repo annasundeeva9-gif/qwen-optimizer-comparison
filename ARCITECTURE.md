@@ -35,6 +35,7 @@ optimizer-comparison/
 │       ├── train.py
 │       ├── evaluate.py
 │       ├── compare.py
+│       ├── artifacts/
 │       ├── data/
 │       ├── models/
 │       ├── training/

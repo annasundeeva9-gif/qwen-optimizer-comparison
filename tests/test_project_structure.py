@@ -13,6 +13,7 @@ def test_expected_project_directories_exist() -> None:
         root / "configs",
         root / "scripts",
         root / "src" / "optimizer_comparison",
+        root / "src" / "optimizer_comparison" / "artifacts",
         root / "tests",
     ]
 

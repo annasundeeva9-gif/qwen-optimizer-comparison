@@ -13,4 +13,14 @@ project:
   name: optimizer-comparison
   output_dir: outputs
 
+artifacts:
+  root_dir: outputs/runs
+  config_filename: config.yaml
+  result_filename: result.json
+  hf_hub:
+    enabled: false
+    repo_id: null
+    token_env_var: HF_TOKEN
+    private: true
+
 seed: 42
