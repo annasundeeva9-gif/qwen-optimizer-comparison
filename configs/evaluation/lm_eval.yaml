@@ -1,0 +1,11 @@
+harness:
+  tasks:
+    - piqa
+    - arc_easy
+    - arc_challenge
+    - winogrande
+    - hellaswag
+  batch_size: auto
+  device: cuda
+  output_path: outputs/eval/lm_eval_results.json
+  raw_log_path: outputs/eval/lm_eval_stdout.txt

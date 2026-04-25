@@ -1,0 +1,5 @@
+name: muon_baseline
+description: "Full Muon baseline on Qwen/Qwen2.5-0.5B."
+tags:
+  stage: full
+  optimizer: muon

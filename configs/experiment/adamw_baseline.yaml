@@ -1,0 +1,5 @@
+name: adamw_baseline
+description: "Full AdamW baseline on Qwen/Qwen2.5-0.5B."
+tags:
+  stage: full
+  optimizer: adamw

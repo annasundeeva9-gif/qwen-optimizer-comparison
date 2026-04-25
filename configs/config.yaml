@@ -1,0 +1,16 @@
+defaults:
+  - mode: mock
+  - model: tiny
+  - data: openwebtext_100k
+  - optimizer: adamw
+  - training: default
+  - evaluation: lm_eval
+  - tracking: mlflow
+  - experiment: mock_adamw
+  - _self_
+
+project:
+  name: optimizer-comparison
+  output_dir: outputs
+
+seed: 42

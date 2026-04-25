@@ -1,0 +1,16 @@
+train_dataset:
+  name: Elriggs/openwebtext-100k
+  split: train
+  text_column: text
+
+storage:
+  raw_dir: outputs/datasets/raw/openwebtext_100k
+  prepared_dir: outputs/datasets/prepared/openwebtext_100k
+  tokenized_dir: outputs/datasets/tokenized/openwebtext_100k
+  save_local: true
+  force_reload: false
+
+tokenization:
+  max_length: 1024
+  padding: false
+  truncation: true

@@ -1,0 +1,4 @@
+enabled: true
+tracking_uri: outputs/mlruns
+experiment_name: optimizer-comparison
+log_artifacts: true

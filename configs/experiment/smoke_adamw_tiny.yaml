@@ -1,0 +1,5 @@
+name: smoke_adamw_tiny
+description: "Smoke run with tiny model and AdamW."
+tags:
+  stage: smoke
+  optimizer: adamw

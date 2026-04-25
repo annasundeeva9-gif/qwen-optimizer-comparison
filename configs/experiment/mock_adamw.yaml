@@ -1,0 +1,5 @@
+name: mock_adamw
+description: "Mock run for validating configs, logging, and file outputs."
+tags:
+  stage: mock
+  optimizer: adamw

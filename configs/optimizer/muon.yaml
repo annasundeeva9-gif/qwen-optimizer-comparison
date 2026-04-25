@@ -1,0 +1,5 @@
+name: muon
+implementation: pending_manual_integration
+lr: null
+weight_decay: null
+notes: "Concrete Muon implementation and parameters are added by the human owner before this stage."

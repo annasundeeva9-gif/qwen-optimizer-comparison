@@ -1,0 +1,5 @@
+name: qwen_0_5b
+pretrained_name_or_path: Qwen/Qwen2.5-0.5B
+tokenizer_name_or_path: Qwen/Qwen2.5-0.5B
+trust_remote_code: true
+torch_dtype: bfloat16
