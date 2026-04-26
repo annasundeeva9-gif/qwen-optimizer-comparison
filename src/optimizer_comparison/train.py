@@ -5,11 +5,16 @@ from __future__ import annotations
 import hydra
 from omegaconf import DictConfig
 
-from optimizer_comparison.artifacts.local_store import create_run_dir, save_json, save_resolved_config
+from optimizer_comparison.artifacts.local_store import (
+    create_run_dir,
+    save_json,
+    save_resolved_config,
+)
 from optimizer_comparison.tracking.mlflow_logger import log_training_run
 from optimizer_comparison.training.mock_trainer import run_mock_training
 from optimizer_comparison.training.result_contract import set_local_artifact_paths
 from optimizer_comparison.training.trainer import run_training
+
 
 # /**
 #  * Запускает training-пайплайн с конфигурацией Hydra.

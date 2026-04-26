@@ -5,6 +5,7 @@ from __future__ import annotations
 import hydra
 from omegaconf import DictConfig
 
+
 # /**
 #  * Собирает результаты нескольких запусков в сравнительный отчет.
 #  *

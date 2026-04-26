@@ -1,5 +1,5 @@
 name: full
 description: "Full remote training run."
 use_mock_trainer: false
-limit_train_samples: null
+smoke_samples_limit: null
 limit_eval_samples: null

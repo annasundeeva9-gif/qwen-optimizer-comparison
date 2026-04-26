@@ -17,7 +17,7 @@ dist/
 
 # Working markdown notes
 *.md
-#!README.md
+# !README.md
 !ARCITECTURE.md
 
 # Local data and experiment outputs

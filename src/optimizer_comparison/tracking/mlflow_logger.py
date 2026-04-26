@@ -50,7 +50,7 @@ def collect_training_params(config: DictConfig) -> dict[str, str]:
         "model.pretrained_name_or_path": config.get("model", {}).get("pretrained_name_or_path"),
         "optimizer.name": config.get("optimizer", {}).get("name"),
         "experiment.name": config.get("experiment", {}).get("name"),
-        "seed": config.get("seed"),
+        "data.split.seed": config.get("data", {}).get("split", {}).get("seed"),
         "training.num_train_epochs": config.get("training", {}).get("num_train_epochs"),
         "training.per_device_train_batch_size": config.get("training", {}).get(
             "per_device_train_batch_size"

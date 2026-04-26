@@ -2,7 +2,11 @@ from pathlib import Path
 
 from omegaconf import OmegaConf
 
-from optimizer_comparison.artifacts.local_store import create_run_dir, save_json, save_resolved_config
+from optimizer_comparison.artifacts.local_store import (
+    create_run_dir,
+    save_json,
+    save_resolved_config,
+)
 
 
 # /**

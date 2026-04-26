@@ -1,5 +1,5 @@
 name: mock
 description: "Dry run with mocked training logic."
 use_mock_trainer: true
-limit_train_samples: 16
+smoke_samples_limit: null
 limit_eval_samples: 8

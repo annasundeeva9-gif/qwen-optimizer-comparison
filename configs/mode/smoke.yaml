@@ -1,5 +1,5 @@
 name: smoke
 description: "Small end-to-end run for validating the training loop."
 use_mock_trainer: false
-limit_train_samples: 128
+smoke_samples_limit: 1000
 limit_eval_samples: 32

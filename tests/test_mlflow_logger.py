@@ -33,7 +33,7 @@ def test_collect_training_params_returns_expected_keys() -> None:
             },
             "optimizer": {"name": "adamw"},
             "experiment": {"name": "mock_adamw"},
-            "seed": 42,
+            "data": {"split": {"seed": 42}},
             "training": {
                 "num_train_epochs": 1,
                 "per_device_train_batch_size": 1,
@@ -50,5 +50,5 @@ def test_collect_training_params_returns_expected_keys() -> None:
     assert params["model.name"] == "tiny"
     assert params["optimizer.name"] == "adamw"
     assert params["experiment.name"] == "mock_adamw"
-    assert params["seed"] == "42"
+    assert params["data.split.seed"] == "42"
     assert "training.max_steps" not in params

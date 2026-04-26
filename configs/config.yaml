@@ -22,5 +22,3 @@ artifacts:
     repo_id: null
     token_env_var: HF_TOKEN
     private: true
-
-seed: 42
