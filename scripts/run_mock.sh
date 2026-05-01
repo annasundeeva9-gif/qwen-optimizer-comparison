@@ -7,4 +7,4 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${PROJECT_ROOT}"
 export PYTHONPATH="${PROJECT_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}"
 
-python -m optimizer_comparison.train mode=mock model=tiny optimizer=adamw experiment=mock_adamw
+python -m optimizer_comparison.train mode=mock model=mock optimizer=adamw experiment=mock_adamw

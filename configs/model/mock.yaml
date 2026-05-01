@@ -1,0 +1,5 @@
+name: mock
+pretrained_name_or_path: null
+tokenizer_name_or_path: null
+trust_remote_code: false
+torch_dtype: null

@@ -1,0 +1,5 @@
+name: tiny_qwen_2_5
+pretrained_name_or_path: trl-internal-testing/tiny-Qwen2ForCausalLM-2.5
+tokenizer_name_or_path: trl-internal-testing/tiny-Qwen2ForCausalLM-2.5
+trust_remote_code: false
+torch_dtype: float32

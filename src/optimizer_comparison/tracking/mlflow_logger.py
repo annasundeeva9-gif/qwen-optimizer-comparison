@@ -91,6 +91,58 @@ def log_training_metrics(training_result: TrainingResult) -> None:
 
 
 # /**
+#  * Логирует историю training/eval метрик по шагам.
+#  *
+#  * @param training_result Training-result с top-level секцией history.
+#  * @return None.
+#  */
+def log_training_history(training_result: TrainingResult) -> None:
+    history = training_result.get("history", [])
+    if not isinstance(history, list):
+        raise TypeError("Training result history must be a list.")
+
+    metric_names = {
+        "loss": "train/loss",
+        "learning_rate": "train/learning_rate",
+        "eval_loss": "eval/loss",
+    }
+    for entry in history:
+        if not isinstance(entry, dict):
+            continue
+        step = entry.get("step", None)
+        if not isinstance(step, int):
+            continue
+        for source_name, mlflow_name in metric_names.items():
+            value = entry.get(source_name, None)
+            if isinstance(value, int | float):
+                mlflow.log_metric(mlflow_name, float(value), step=step)
+
+
+# /**
+#  * Логирует ссылки на Hugging Face Hub artifacts в MLflow tags.
+#  *
+#  * @param training_result Training-result с artifacts.hf_hub metadata.
+#  * @return None.
+#  */
+def log_hf_hub_tags(training_result: TrainingResult) -> None:
+    artifacts = training_result.get("artifacts", {})
+    if not isinstance(artifacts, dict):
+        raise TypeError("Training result artifacts must be a dictionary.")
+
+    hf_hub = artifacts.get("hf_hub", {})
+    if not isinstance(hf_hub, dict):
+        return
+
+    tags = {
+        f"hf_hub.{key}": str(hf_hub[key])
+        for key in ("repo_id", "commit_url", "revision", "artifact_path")
+        if hf_hub.get(key) is not None
+    }
+    if tags:
+        mlflow.set_tags(tags)
+
+
+# /**
 #  * Логирует локальные артефакты training-запуска в текущий MLflow run.
 #  *
 #  * @param config Полная конфигурация запуска.
@@ -134,6 +186,8 @@ def log_training_run(config: DictConfig, training_result: TrainingResult) -> Non
             mlflow.set_tags({str(key): str(value) for key, value in experiment_tags.items()})
 
         log_training_metrics(training_result)
+        log_training_history(training_result)
+        log_hf_hub_tags(training_result)
         log_training_artifacts(config=config, training_result=training_result)
 
 

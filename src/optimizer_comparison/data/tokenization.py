@@ -7,25 +7,12 @@ from typing import Any
 
 from datasets import Dataset, DatasetDict
 from omegaconf import DictConfig
-from transformers import AutoTokenizer
 
 from optimizer_comparison.data.dataset_loader import (
     dataset_local_path_exists,
     load_dataset_local,
     save_dataset_local,
 )
-
-
-# /**
-#  * Загружает единственный токенизатор проекта из HuggingFace.
-#  *
-#  * @param config Конфигурация модели с именем токенизатора.
-#  * @return HuggingFace tokenizer.
-#  */
-def build_tokenizer(config: DictConfig) -> Any:
-    tokenizer_name = str(config.tokenizer_name_or_path)
-    trust_remote_code = bool(config.get("trust_remote_code", False))
-    return AutoTokenizer.from_pretrained(tokenizer_name, trust_remote_code=trust_remote_code)
 
 
 # /**

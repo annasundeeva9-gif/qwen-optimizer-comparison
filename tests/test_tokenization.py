@@ -12,11 +12,17 @@ from optimizer_comparison.data.dataset_loader import (
     save_dataset_local,
 )
 from optimizer_comparison.data.tokenization import (
-    build_tokenizer,
     load_or_tokenize_splits,
     resolve_num_proc,
     tokenize_dataset,
     tokenize_splits,
+)
+from optimizer_comparison.models import tokenization as model_tokenization
+from optimizer_comparison.models.tokenization import (
+    FULL_QWEN_EOS_TOKEN,
+    TINY_QWEN_MODEL_ID,
+    align_tiny_qwen_special_tokens,
+    build_tokenizer,
 )
 
 
@@ -56,6 +62,14 @@ class FakeTokenizer:
             "input_ids": input_ids,
             "attention_mask": [[1] * len(tokens) for tokens in input_ids],
         }
+
+
+# /**
+#  * Минимальный tokenizer stub для проверки правки special tokens.
+#  */
+class FakeSpecialTokensTokenizer:
+    def __init__(self, eos_token: str) -> None:
+        self.eos_token = eos_token
 
 
 # /**
@@ -131,7 +145,7 @@ def test_build_tokenizer_uses_model_config(monkeypatch: MonkeyPatch) -> None:
             calls.append((name, trust_remote_code))
             return "tokenizer"
 
-    monkeypatch.setattr(tokenization, "AutoTokenizer", FakeAutoTokenizer)
+    monkeypatch.setattr(model_tokenization, "AutoTokenizer", FakeAutoTokenizer)
     model_config = OmegaConf.create(
         {
             "tokenizer_name_or_path": "unit-test/tokenizer",
@@ -143,6 +157,46 @@ def test_build_tokenizer_uses_model_config(monkeypatch: MonkeyPatch) -> None:
 
     assert loaded_tokenizer == "tokenizer"
     assert calls == [("unit-test/tokenizer", True)]
+
+
+# /**
+#  * Проверяет, что tiny Qwen smoke tokenizer получает EOS основной Qwen-модели.
+#  *
+#  * @return None.
+#  */
+def test_align_tiny_qwen_special_tokens_uses_full_qwen_eos() -> None:
+    tokenizer = FakeSpecialTokensTokenizer(eos_token="<|im_end|>")
+    config = OmegaConf.create(
+        {
+            "pretrained_name_or_path": TINY_QWEN_MODEL_ID,
+            "tokenizer_name_or_path": TINY_QWEN_MODEL_ID,
+        }
+    )
+
+    aligned_tokenizer = align_tiny_qwen_special_tokens(tokenizer=tokenizer, config=config)
+
+    assert aligned_tokenizer is tokenizer
+    assert tokenizer.eos_token == FULL_QWEN_EOS_TOKEN
+
+
+# /**
+#  * Проверяет, что special tokens не меняются для остальных моделей.
+#  *
+#  * @return None.
+#  */
+def test_align_tiny_qwen_special_tokens_keeps_other_models() -> None:
+    tokenizer = FakeSpecialTokensTokenizer(eos_token="<|custom_eos|>")
+    config = OmegaConf.create(
+        {
+            "pretrained_name_or_path": "unit-test/model",
+            "tokenizer_name_or_path": "unit-test/tokenizer",
+        }
+    )
+
+    aligned_tokenizer = align_tiny_qwen_special_tokens(tokenizer=tokenizer, config=config)
+
+    assert aligned_tokenizer is tokenizer
+    assert tokenizer.eos_token == "<|custom_eos|>"
 
 
 # /**

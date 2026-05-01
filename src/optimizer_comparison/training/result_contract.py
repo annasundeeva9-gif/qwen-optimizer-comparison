@@ -29,6 +29,20 @@ def build_empty_artifacts() -> dict[str, object]:
         },
         "checkpoints": {
             "local_path": None,
+            "best_path": None,
+            "last_path": None,
+            "cleanup_status": "not_applicable",
+            "cleanup_error": None,
+            "removed_paths": [],
+        },
+        "hf_hub": {
+            "repo_id": None,
+            "artifact_path": None,
+            "revision": None,
+            "commit_url": None,
+            "result_commit_url": None,
+            "upload_status": "not_applicable",
+            "upload_error": None,
         },
     }
 
@@ -58,6 +72,7 @@ def build_training_result(
             "training_time_seconds": training_time_seconds,
             "max_memory_mb": max_memory_mb,
         },
+        "history": [],
         "artifacts": build_empty_artifacts(),
     }
 

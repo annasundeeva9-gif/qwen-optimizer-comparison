@@ -1,8 +1,34 @@
 num_train_epochs: 1
 per_device_train_batch_size: 1
+per_device_eval_batch_size: 1
 gradient_accumulation_steps: 1
 max_steps: null
+logging_strategy: steps
 logging_steps: 1
+eval_strategy: steps
+eval_steps: 100
+save_strategy: steps
 save_steps: 100
+save_total_limit: 2
+load_best_model_at_end: true
+metric_for_best_model: eval_loss
+greater_is_better: false
 checkpoint_dir: outputs/checkpoints
+output_dir: outputs/trainer
 use_gradient_checkpointing: false
+bf16: false
+fp16: false
+dataloader_num_workers: 0
+remove_unused_columns: false
+report_to: []
+
+trainer:
+  name: hf_standard
+  use_custom_optimizer: false
+  custom_trainer_class: null
+
+checkpoints:
+  save_best: true
+  save_last: true
+  best_dir_name: best
+  last_dir_name: last

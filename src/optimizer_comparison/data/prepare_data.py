@@ -12,7 +12,8 @@ from optimizer_comparison.data.chunking import load_or_chunk_splits
 from optimizer_comparison.data.dataset_loader import load_or_download_raw_dataset
 from optimizer_comparison.data.preprocessing import load_or_preprocess_dataset
 from optimizer_comparison.data.splits import load_or_build_splits
-from optimizer_comparison.data.tokenization import build_tokenizer, load_or_tokenize_splits
+from optimizer_comparison.data.tokenization import load_or_tokenize_splits
+from optimizer_comparison.models.tokenization import build_tokenizer
 
 
 # /**
