@@ -65,6 +65,8 @@ def build_training_result(
     max_memory_mb: float | None,
 ) -> TrainingResult:
     return {
+        "run_id": None,
+        "mlflow_run_id": None,
         "status": status,
         "run_name": run_name,
         "metrics": {
@@ -96,6 +98,7 @@ def set_local_artifact_paths(
     if not isinstance(artifacts, dict):
         raise TypeError("Training result artifacts must be a dictionary.")
 
+    result["run_id"] = Path(run_dir).name
     artifacts["run_dir"] = str(run_dir)
     artifacts["config_path"] = str(config_path)
     artifacts["result_path"] = str(result_path)

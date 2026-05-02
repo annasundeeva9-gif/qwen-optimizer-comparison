@@ -8,8 +8,10 @@ from omegaconf import OmegaConf
 from optimizer_comparison.artifacts import hf_hub
 from optimizer_comparison.artifacts.hf_hub import (
     cleanup_local_checkpoint_artifacts,
+    create_mlflow_snapshot_archive,
     download_artifacts_from_hf,
     persist_training_artifacts_to_hf,
+    upload_mlflow_snapshot_to_hf,
     upload_path_to_hf,
     validate_hf_hub_before_training,
 )
@@ -138,7 +140,9 @@ def make_result(tmp_path: Path) -> dict[str, object]:
         training_time_seconds=10.0,
         max_memory_mb=100.0,
     )
-    run_dir = tmp_path / "adamw_baseline" / "2026-04-29_10-00-00"
+    run_id = "adamw_baseline__2026-04-29_10-00-00"
+    result["run_id"] = run_id
+    run_dir = tmp_path / run_id
     model_dir = run_dir / "model"
     tokenizer_dir = run_dir / "tokenizer"
     checkpoints_dir = run_dir / "checkpoints"
@@ -274,12 +278,12 @@ def test_persist_training_artifacts_writes_metadata(
     assert isinstance(artifacts, dict)
     assert artifacts["hf_hub"]["upload_status"] == "completed"
     assert artifacts["hf_hub"]["repo_id"] == "user/repo"
-    assert artifacts["hf_hub"]["artifact_path"] == "runs/adamw_baseline/2026-04-29_10-00-00"
+    assert artifacts["hf_hub"]["artifact_path"] == "runs/adamw_baseline__2026-04-29_10-00-00"
     assert artifacts["model"]["hf_repo_id"] == "user/repo"
     assert artifacts["checkpoints"]["cleanup_status"] == "completed"
     assert artifacts["checkpoints"]["local_path"] is None
-    assert not (tmp_path / "adamw_baseline" / "2026-04-29_10-00-00" / "checkpoints").exists()
-    assert not (tmp_path / "adamw_baseline" / "2026-04-29_10-00-00" / "trainer_output").exists()
+    assert not (tmp_path / "adamw_baseline__2026-04-29_10-00-00" / "checkpoints").exists()
+    assert not (tmp_path / "adamw_baseline__2026-04-29_10-00-00" / "trainer_output").exists()
 
 
 # /**
@@ -336,3 +340,59 @@ def test_download_artifacts_from_hf_uses_repo_path(
     assert restored_path == tmp_path / "runs/adamw/run"
     assert calls[0]["allow_patterns"] == ["runs/adamw/run/**"]
     assert calls[0]["revision"] == "abc"
+
+
+# /**
+#  * Проверяет создание zip snapshot-а MLflow file store.
+#  *
+#  * @param tmp_path Временная директория pytest.
+#  * @return None.
+#  */
+def test_create_mlflow_snapshot_archive_creates_zip(tmp_path: Path) -> None:
+    mlruns_dir = tmp_path / "mlruns"
+    run_metric = mlruns_dir / "1" / "run" / "metrics" / "loss"
+    run_metric.parent.mkdir(parents=True)
+    run_metric.write_text("1 0.5 1\n", encoding="utf-8")
+
+    archive_path = create_mlflow_snapshot_archive(
+        mlruns_dir=mlruns_dir,
+        output_dir=tmp_path / "snapshots",
+    )
+
+    assert archive_path == tmp_path / "snapshots" / "mlruns_snapshot.zip"
+    assert archive_path.is_file()
+
+
+# /**
+#  * Проверяет upload MLflow snapshot-а через общий HF upload helper.
+#  *
+#  * @param monkeypatch Инструмент pytest для подмены upload.
+#  * @param tmp_path Временная директория pytest.
+#  * @return None.
+#  */
+def test_upload_mlflow_snapshot_to_hf_uploads_zip(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    mlruns_dir = tmp_path / "mlruns"
+    mlruns_dir.mkdir()
+    calls: list[dict[str, Any]] = []
+
+    def fake_upload_path_to_hf(**kwargs: Any) -> dict[str, str | None]:
+        calls.append(kwargs)
+        return {"commit_url": "url", "revision": "rev"}
+
+    monkeypatch.setattr(hf_hub, "upload_path_to_hf", fake_upload_path_to_hf)
+
+    metadata = upload_mlflow_snapshot_to_hf(
+        mlruns_dir=mlruns_dir,
+        repo_id="user/repo",
+        token="token",
+        repo_path="mlflow/mlruns_after_training.zip",
+        snapshot_dir=tmp_path / "snapshots",
+    )
+
+    assert metadata == {"commit_url": "url", "revision": "rev"}
+    assert calls[0]["repo_id"] == "user/repo"
+    assert calls[0]["repo_path"] == "mlflow/mlruns_after_training.zip"
+    assert Path(calls[0]["artifact_path"]).is_file()

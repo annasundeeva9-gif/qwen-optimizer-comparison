@@ -1,8 +1,13 @@
+import json
+from pathlib import Path
+
 from omegaconf import OmegaConf
 
 from optimizer_comparison.tracking.mlflow_logger import (
     collect_training_params,
     is_tracking_enabled,
+    log_custom_artifacts,
+    log_evaluation_run,
     log_hf_hub_tags,
     log_training_history,
 )
@@ -123,5 +128,121 @@ def test_log_hf_hub_tags_logs_artifact_metadata(monkeypatch) -> None:
             "hf_hub.commit_url": "https://huggingface.co/user/repo/commit/abc",
             "hf_hub.revision": "abc",
             "hf_hub.artifact_path": "runs/adamw/run",
+        }
+    ]
+
+
+# /**
+#  * Проверяет, что custom artifacts логируются только явно переданными путями.
+#  *
+#  * @param monkeypatch Инструмент pytest для подмены mlflow.log_artifact.
+#  * @param tmp_path Временная директория pytest.
+#  * @return None.
+#  */
+def test_log_custom_artifacts_logs_explicit_files(monkeypatch, tmp_path: Path) -> None:
+    artifact_path = tmp_path / "plot.png"
+    artifact_path.write_text("plot", encoding="utf-8")
+    logged_artifacts: list[str] = []
+
+    monkeypatch.setattr(
+        "optimizer_comparison.tracking.mlflow_logger.mlflow.log_artifact",
+        lambda path: logged_artifacts.append(path),
+    )
+
+    log_custom_artifacts(
+        config=OmegaConf.create({"tracking": {"log_artifacts": True}}),
+        artifact_paths=[str(artifact_path), str(tmp_path / "missing.png")],
+    )
+
+    assert logged_artifacts == [str(artifact_path)]
+
+
+# /**
+#  * Проверяет логирование evaluation metrics в существующий MLflow run.
+#  *
+#  * @param monkeypatch Инструмент pytest для подмены MLflow API.
+#  * @param tmp_path Временная директория pytest.
+#  * @return None.
+#  */
+def test_log_evaluation_run_logs_metrics_to_existing_run(monkeypatch, tmp_path: Path) -> None:
+    lm_eval_result_path = tmp_path / "lm_eval_results.json"
+    lm_eval_result_path.write_text(
+        json.dumps(
+            {
+                "results": {
+                    "piqa": {
+                        "acc,none": 0.75,
+                        "acc_stderr,none": 0.01,
+                        "alias": "piqa",
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    started_runs: list[str] = []
+    logged_metrics: list[tuple[str, float]] = []
+    logged_tags: list[dict[str, str]] = []
+
+    class FakeRun:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+    def fake_start_run(run_id: str):
+        started_runs.append(run_id)
+        return FakeRun()
+
+    monkeypatch.setattr(
+        "optimizer_comparison.tracking.mlflow_logger.mlflow.set_tracking_uri",
+        lambda uri: None,
+    )
+    monkeypatch.setattr(
+        "optimizer_comparison.tracking.mlflow_logger.mlflow.set_experiment",
+        lambda name: None,
+    )
+    monkeypatch.setattr(
+        "optimizer_comparison.tracking.mlflow_logger.mlflow.start_run",
+        fake_start_run,
+    )
+    monkeypatch.setattr(
+        "optimizer_comparison.tracking.mlflow_logger.mlflow.log_metric",
+        lambda name, value: logged_metrics.append((name, value)),
+    )
+    monkeypatch.setattr(
+        "optimizer_comparison.tracking.mlflow_logger.mlflow.set_tags",
+        lambda tags: logged_tags.append(tags),
+    )
+
+    log_evaluation_run(
+        config=OmegaConf.create(
+            {
+                "tracking": {
+                    "enabled": True,
+                    "tracking_uri": str(tmp_path / "mlruns"),
+                    "experiment_name": "optimizer-comparison",
+                }
+            }
+        ),
+        evaluation_result={
+            "status": "completed",
+            "mlflow_run_id": "mlflow-run-id",
+            "lm_eval_result_path": str(lm_eval_result_path),
+            "raw_log_path": str(tmp_path / "stdout.txt"),
+        },
+    )
+
+    assert started_runs == ["mlflow-run-id"]
+    assert logged_metrics == [
+        ("eval_harness/piqa/acc/none", 0.75),
+        ("eval_harness/piqa/acc_stderr/none", 0.01),
+    ]
+    assert logged_tags == [
+        {
+            "evaluation.status": "completed",
+            "evaluation.result_path": str(lm_eval_result_path),
+            "evaluation.raw_log_path": str(tmp_path / "stdout.txt"),
         }
     ]

@@ -33,20 +33,37 @@ def resolve_project_path(path: str | Path) -> Path:
 
 
 # /**
+#  * Собирает человекочитаемый id запуска из имени эксперимента и timestamp-а.
+#  *
+#  * @param experiment_name Имя эксперимента из Hydra-конфига.
+#  * @param timestamp Timestamp запуска.
+#  * @return Run id для локальных и удаленных artifacts.
+#  */
+def build_run_id(experiment_name: str, timestamp: str) -> str:
+    return f"{experiment_name}__{timestamp}"
+
+
+# /**
 #  * Создает локальную директорию конкретного запуска.
 #  *
 #  * @param artifacts_root_dir Базовая директория локальных артефактов из Hydra-конфига.
 #  * @param experiment_name Имя эксперимента из Hydra-конфига.
 #  * @param timestamp Опциональный timestamp для тестов и воспроизводимых путей.
+#  * @param run_id Опциональный готовый run id для восстановления существующего запуска.
 #  * @return Абсолютный путь к созданной директории запуска.
 #  */
 def create_run_dir(
     artifacts_root_dir: str | Path,
     experiment_name: str,
     timestamp: str | None = None,
+    run_id: str | None = None,
 ) -> Path:
     run_timestamp = timestamp or datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    run_dir = resolve_project_path(artifacts_root_dir) / experiment_name / run_timestamp
+    resolved_run_id = run_id or build_run_id(
+        experiment_name=experiment_name,
+        timestamp=run_timestamp,
+    )
+    run_dir = resolve_project_path(artifacts_root_dir) / resolved_run_id
     run_dir.mkdir(parents=True, exist_ok=False)
     return run_dir
 

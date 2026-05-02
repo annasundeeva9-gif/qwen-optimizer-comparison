@@ -134,6 +134,68 @@ def download_artifacts_from_hf(
 
 
 # /**
+#  * Создает zip-архив локального MLflow file store.
+#  *
+#  * @param mlruns_dir Локальная директория MLflow file store.
+#  * @param output_dir Директория для snapshot-архива.
+#  * @param archive_name Имя архива без расширения.
+#  * @return Путь к созданному zip-архиву.
+#  */
+def create_mlflow_snapshot_archive(
+    mlruns_dir: str | Path,
+    output_dir: str | Path,
+    archive_name: str = "mlruns_snapshot",
+) -> Path:
+    mlruns_path = Path(mlruns_dir)
+    if not mlruns_path.is_dir():
+        raise FileNotFoundError(f"MLflow directory does not exist: {mlruns_dir}")
+
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    archive_path = output_path / f"{archive_name}.zip"
+    if archive_path.exists():
+        archive_path.unlink()
+
+    created_archive = shutil.make_archive(
+        base_name=str(output_path / archive_name),
+        format="zip",
+        root_dir=str(mlruns_path.parent),
+        base_dir=mlruns_path.name,
+    )
+    return Path(created_archive)
+
+
+# /**
+#  * Загружает zip snapshot MLflow file store в Hugging Face Hub.
+#  *
+#  * @param mlruns_dir Локальная директория MLflow file store.
+#  * @param repo_id Идентификатор HF repo.
+#  * @param token HF token.
+#  * @param repo_path Путь zip-архива внутри repo.
+#  * @param snapshot_dir Локальная директория для временного snapshot-архива.
+#  * @return Метаданные upload-а.
+#  */
+def upload_mlflow_snapshot_to_hf(
+    mlruns_dir: str | Path,
+    repo_id: str,
+    token: str,
+    repo_path: str = "mlflow/mlruns_snapshot.zip",
+    snapshot_dir: str | Path = "outputs/mlflow_snapshots",
+) -> dict[str, str | None]:
+    archive_path = create_mlflow_snapshot_archive(
+        mlruns_dir=mlruns_dir,
+        output_dir=snapshot_dir,
+    )
+    return upload_path_to_hf(
+        artifact_path=archive_path,
+        repo_id=repo_id,
+        repo_path=repo_path,
+        token=token,
+        commit_message="Upload MLflow snapshot",
+    )
+
+
+# /**
 #  * Записывает статус HF Hub upload в training-result.
 #  *
 #  * @param result Training-result, который нужно обновить.
@@ -309,7 +371,8 @@ def upload_training_artifact_paths(
     if run_dir is None:
         raise ValueError("Training result artifacts.run_dir must be set before HF upload.")
 
-    artifact_path = f"runs/{experiment_name}/{Path(str(run_dir)).name}"
+    run_id = str(result.get("run_id") or Path(str(run_dir)).name)
+    artifact_path = f"runs/{run_id}"
     model_artifacts = artifacts.get("model", {})
     tokenizer_artifacts = artifacts.get("tokenizer", {})
     uploads = {

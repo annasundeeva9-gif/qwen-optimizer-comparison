@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 import mlflow
 from omegaconf import DictConfig
 
 from optimizer_comparison.artifacts.local_store import resolve_project_path
+from optimizer_comparison.evaluation.result_parser import parse_lm_eval_results
 from optimizer_comparison.training.result_contract import TrainingResult
 
 
@@ -149,18 +149,14 @@ def log_hf_hub_tags(training_result: TrainingResult) -> None:
 #  * @param training_result Training-result с путями к локальным артефактам.
 #  * @return None.
 #  */
-def log_training_artifacts(config: DictConfig, training_result: TrainingResult) -> None:
+def log_custom_artifacts(config: DictConfig, artifact_paths: list[str]) -> None:
     if not bool(config.get("tracking", {}).get("log_artifacts", False)):
         return
 
-    artifacts = training_result.get("artifacts", {})
-    if not isinstance(artifacts, dict):
-        raise TypeError("Training result artifacts must be a dictionary.")
-
-    for artifact_key in ("config_path", "result_path"):
-        artifact_path = artifacts.get(artifact_key)
-        if artifact_path is not None and Path(str(artifact_path)).is_file():
-            mlflow.log_artifact(str(artifact_path))
+    for artifact_path in artifact_paths:
+        path = resolve_project_path(artifact_path)
+        if path.is_file():
+            mlflow.log_artifact(str(path))
 
 
 # /**
@@ -170,16 +166,17 @@ def log_training_artifacts(config: DictConfig, training_result: TrainingResult) 
 #  * @param training_result Training-result с метриками и путями к артефактам.
 #  * @return None.
 #  */
-def log_training_run(config: DictConfig, training_result: TrainingResult) -> None:
+def log_training_run(config: DictConfig, training_result: TrainingResult) -> str | None:
     if not is_tracking_enabled(config):
-        return
+        return None
 
     setup_mlflow(config)
 
     run_name = str(training_result.get("run_name", config.get("experiment", {}).get("name", "run")))
-    with mlflow.start_run(run_name=run_name):
+    with mlflow.start_run(run_name=run_name) as active_run:
         log_run_config(config)
         mlflow.set_tag("run.status", str(training_result.get("status", "unknown")))
+        mlflow.set_tag("project.run_id", str(training_result.get("run_id", "")))
 
         experiment_tags = config.get("experiment", {}).get("tags", {})
         if isinstance(experiment_tags, dict):
@@ -188,7 +185,28 @@ def log_training_run(config: DictConfig, training_result: TrainingResult) -> Non
         log_training_metrics(training_result)
         log_training_history(training_result)
         log_hf_hub_tags(training_result)
-        log_training_artifacts(config=config, training_result=training_result)
+
+        return active_run.info.run_id
+
+
+# /**
+#  * Дописывает HF Hub metadata в уже созданный MLflow training run.
+#  *
+#  * @param config Полная конфигурация запуска.
+#  * @param training_result Training-result с mlflow_run_id и HF Hub metadata.
+#  * @return None.
+#  */
+def update_training_run_hf_tags(config: DictConfig, training_result: TrainingResult) -> None:
+    if not is_tracking_enabled(config):
+        return
+
+    mlflow_run_id = training_result.get("mlflow_run_id", None)
+    if mlflow_run_id is None:
+        return
+
+    setup_mlflow(config)
+    with mlflow.start_run(run_id=str(mlflow_run_id)):
+        log_hf_hub_tags(training_result)
 
 
 # /**
@@ -197,8 +215,14 @@ def log_training_run(config: DictConfig, training_result: TrainingResult) -> Non
 #  * @param evaluation_result Evaluation-result будущего evaluation-пайплайна.
 #  * @return None.
 #  */
-def log_evaluation_metrics(evaluation_result: dict[str, Any]) -> None:
-    raise NotImplementedError("Evaluation metrics logging is pending evaluation pipeline.")
+def log_evaluation_metrics(parsed_lm_eval_result: dict[str, Any]) -> None:
+    metrics = parsed_lm_eval_result.get("metrics", {})
+    if not isinstance(metrics, dict):
+        raise TypeError("Parsed lm-evaluation-harness metrics must be a dictionary.")
+
+    for metric_name, metric_value in metrics.items():
+        if isinstance(metric_value, int | float):
+            mlflow.log_metric(str(metric_name), float(metric_value))
 
 
 # /**
@@ -207,8 +231,17 @@ def log_evaluation_metrics(evaluation_result: dict[str, Any]) -> None:
 #  * @param evaluation_result Evaluation-result будущего evaluation-пайплайна.
 #  * @return None.
 #  */
-def log_evaluation_artifacts(evaluation_result: dict[str, Any]) -> None:
-    raise NotImplementedError("Evaluation artifact logging is pending evaluation pipeline.")
+def log_evaluation_tags(evaluation_result: dict[str, Any]) -> None:
+    tags = {
+        "evaluation.status": str(evaluation_result.get("status", "unknown")),
+        "evaluation.result_path": str(evaluation_result.get("lm_eval_result_path", "")),
+    }
+
+    raw_log_path = evaluation_result.get("raw_log_path", None)
+    if raw_log_path is not None:
+        tags["evaluation.raw_log_path"] = str(raw_log_path)
+
+    mlflow.set_tags(tags)
 
 
 # /**
@@ -219,4 +252,19 @@ def log_evaluation_artifacts(evaluation_result: dict[str, Any]) -> None:
 #  * @return None.
 #  */
 def log_evaluation_run(config: DictConfig, evaluation_result: dict[str, Any]) -> None:
-    raise NotImplementedError("Evaluation run logging is pending evaluation pipeline.")
+    if not is_tracking_enabled(config):
+        return
+
+    mlflow_run_id = evaluation_result.get("mlflow_run_id", None)
+    if mlflow_run_id is None:
+        raise ValueError("evaluation_result.mlflow_run_id is required for MLflow logging.")
+
+    lm_eval_result_path = evaluation_result.get("lm_eval_result_path", None)
+    if lm_eval_result_path is None:
+        raise ValueError("evaluation_result.lm_eval_result_path is required.")
+
+    setup_mlflow(config)
+    parsed_lm_eval_result = parse_lm_eval_results(str(lm_eval_result_path))
+    with mlflow.start_run(run_id=str(mlflow_run_id)):
+        log_evaluation_metrics(parsed_lm_eval_result)
+        log_evaluation_tags(evaluation_result)

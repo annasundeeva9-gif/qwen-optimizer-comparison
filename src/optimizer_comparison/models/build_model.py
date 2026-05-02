@@ -25,8 +25,11 @@ def resolve_torch_dtype(dtype_name: str | None) -> torch.dtype | None:
 
     dtype_by_name = {
         "float32": torch.float32,
+        "float": torch.float32,
         "float16": torch.float16,
+        "half": torch.float16,
         "bfloat16": torch.bfloat16,
+        "bf16": torch.bfloat16,
     }
     dtype = dtype_by_name.get(normalized_dtype)
     if dtype is None:
@@ -48,7 +51,7 @@ def build_model(config: DictConfig) -> Any:
     kwargs: dict[str, Any] = {
         "trust_remote_code": bool(config.get("trust_remote_code", False)),
     }
-    
+
     dtype = resolve_torch_dtype(config.get("torch_dtype", None))
     if dtype is not None:
         kwargs["dtype"] = dtype

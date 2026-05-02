@@ -16,6 +16,8 @@ def test_training_result_has_required_top_level_keys() -> None:
     )
 
     assert result["status"] == "completed"
+    assert result["run_id"] is None
+    assert result["mlflow_run_id"] is None
     assert result["run_name"] == "mock_adamw"
     assert "metrics" in result
     assert "history" in result

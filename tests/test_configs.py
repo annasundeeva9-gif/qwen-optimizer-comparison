@@ -55,3 +55,55 @@ def test_training_config_contains_trainer_and_checkpoint_blocks() -> None:
     assert config.eval_strategy == "steps"
     assert config.save_strategy == "steps"
     assert config.logging_strategy == "steps"
+
+
+# /**
+#  * Проверяет базовый контракт lm-evaluation-harness конфига.
+#  *
+#  * @return None.
+#  */
+def test_evaluation_config_contains_lm_eval_contract() -> None:
+    root = Path(__file__).resolve().parents[1]
+    config = OmegaConf.load(root / "configs" / "evaluation" / "lm_eval.yaml")
+
+    assert list(config.harness.tasks) == [
+        "piqa",
+        "arc_easy",
+        "arc_challenge",
+        "winogrande",
+        "hellaswag",
+    ]
+    assert config.harness.batch_size == "auto"
+    assert "device" not in config.harness
+    assert config.harness.output_path == "outputs/eval/lm_eval_results.json"
+    assert config.harness.raw_log_path == "outputs/eval/lm_eval_stdout.txt"
+    assert config.harness.result_filename == "evaluation_result.json"
+
+    assert config.source.use_hf_hub is False
+    assert config.source.run_dir is None
+    assert config.source.model_path is None
+    assert config.source.tokenizer_path is None
+    assert config.source.repo_id is None
+    assert config.source.repo_path is None
+    assert config.source.revision is None
+    assert config.source.token_env_var == "HF_TOKEN"
+    assert config.source.download_dir == "outputs/eval/hf_artifacts"
+
+
+# /**
+#  * Проверяет лимиты evaluation samples для smoke/full режимов.
+#  *
+#  * @return None.
+#  */
+def test_mode_configs_define_expected_evaluation_limits() -> None:
+    root = Path(__file__).resolve().parents[1]
+    smoke_config = OmegaConf.load(root / "configs" / "mode" / "smoke.yaml")
+    full_config = OmegaConf.load(root / "configs" / "mode" / "full.yaml")
+
+    assert smoke_config.limit_eval_samples == 32
+    assert smoke_config.data.split.dir == "outputs/datasets/split_raw/openwebtext_100k_smoke"
+    assert smoke_config.data.tokenization.dir == (
+        "outputs/datasets/tokenized/openwebtext_100k_smoke"
+    )
+    assert smoke_config.data.final.dir == "outputs/datasets/final/openwebtext_100k_smoke"
+    assert full_config.limit_eval_samples is None

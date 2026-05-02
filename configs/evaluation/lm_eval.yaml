@@ -6,6 +6,17 @@ harness:
     - winogrande
     - hellaswag
   batch_size: auto
-  device: cuda
   output_path: outputs/eval/lm_eval_results.json
   raw_log_path: outputs/eval/lm_eval_stdout.txt
+  result_filename: evaluation_result.json
+
+source:
+  use_hf_hub: false
+  run_dir: null
+  model_path: null
+  tokenizer_path: null
+  repo_id: null
+  repo_path: null
+  revision: null
+  token_env_var: HF_TOKEN
+  download_dir: outputs/eval/hf_artifacts

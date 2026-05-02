@@ -3,6 +3,7 @@ from pathlib import Path
 from omegaconf import OmegaConf
 
 from optimizer_comparison.artifacts.local_store import (
+    build_run_id,
     create_run_dir,
     save_json,
     save_resolved_config,
@@ -10,19 +11,34 @@ from optimizer_comparison.artifacts.local_store import (
 
 
 # /**
-#  * Проверяет создание директории запуска по имени эксперимента и timestamp.
+#  * Проверяет создание run id по имени эксперимента и timestamp.
+#  *
+#  * @return None.
+#  */
+def test_build_run_id_uses_experiment_name_and_timestamp() -> None:
+    assert (
+        build_run_id(
+            experiment_name="mock_adamw",
+            timestamp="2026-04-25_20-30-00",
+        )
+        == "mock_adamw__2026-04-25_20-30-00"
+    )
+
+
+# /**
+#  * Проверяет создание директории запуска по run id.
 #  *
 #  * @param tmp_path Временная директория pytest.
 #  * @return None.
 #  */
-def test_create_run_dir_uses_experiment_name_and_timestamp(tmp_path: Path) -> None:
+def test_create_run_dir_uses_run_id(tmp_path: Path) -> None:
     run_dir = create_run_dir(
         artifacts_root_dir=tmp_path,
         experiment_name="mock_adamw",
         timestamp="2026-04-25_20-30-00",
     )
 
-    assert run_dir == tmp_path / "mock_adamw" / "2026-04-25_20-30-00"
+    assert run_dir == tmp_path / "mock_adamw__2026-04-25_20-30-00"
     assert run_dir.is_dir()
 
 

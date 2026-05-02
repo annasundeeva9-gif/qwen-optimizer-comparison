@@ -7,8 +7,10 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${PROJECT_ROOT}"
 export PYTHONPATH="${PROJECT_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}"
 
+echo "Starting smoke training: optimizer=adamw model=tiny_qwen_2_5"
 python -m optimizer_comparison.train \
   mode=smoke \
   model=tiny_qwen_2_5 \
   optimizer=adamw \
-  experiment=smoke_adamw_tiny
+  experiment=smoke_adamw_tiny \
+  data.final.dir=outputs/datasets/final/openwebtext_100k_smoke

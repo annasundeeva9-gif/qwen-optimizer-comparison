@@ -14,7 +14,10 @@ from optimizer_comparison.artifacts.local_store import (
     save_json,
     save_resolved_config,
 )
-from optimizer_comparison.tracking.mlflow_logger import log_training_run
+from optimizer_comparison.tracking.mlflow_logger import (
+    log_training_run,
+    update_training_run_hf_tags,
+)
 from optimizer_comparison.training.mock_trainer import run_mock_training
 from optimizer_comparison.training.result_contract import set_local_artifact_paths
 from optimizer_comparison.training.trainer import run_training
@@ -54,9 +57,11 @@ def main(config: DictConfig) -> None:
         result_path=result_path,
     )
     save_json(data=result, output_path=result_path)
+    result["mlflow_run_id"] = log_training_run(config=config, training_result=result)
+    save_json(data=result, output_path=result_path)
     result = persist_training_artifacts_to_hf(config=config, result=result)
     save_json(data=result, output_path=result_path)
-    log_training_run(config=config, training_result=result)
+    update_training_run_hf_tags(config=config, training_result=result)
 
 
 if __name__ == "__main__":
