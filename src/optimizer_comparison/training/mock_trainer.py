@@ -21,5 +21,6 @@ def run_mock_training(config: DictConfig) -> TrainingResult:
         status="completed",
         final_loss=0.0,
         training_time_seconds=0.0,
+        time_per_step_seconds=0.0,
         max_memory_mb=0.0,
     )

@@ -12,6 +12,7 @@ def test_training_result_has_required_top_level_keys() -> None:
         status="completed",
         final_loss=0.0,
         training_time_seconds=0.0,
+        time_per_step_seconds=0.0,
         max_memory_mb=0.0,
     )
 
@@ -35,6 +36,7 @@ def test_training_result_has_required_metrics() -> None:
         status="completed",
         final_loss=0.0,
         training_time_seconds=0.0,
+        time_per_step_seconds=0.0,
         max_memory_mb=0.0,
     )
 
@@ -43,6 +45,7 @@ def test_training_result_has_required_metrics() -> None:
     assert isinstance(metrics, dict)
     assert metrics["final_loss"] == 0.0
     assert metrics["training_time_seconds"] == 0.0
+    assert metrics["time_per_step_seconds"] == 0.0
     assert metrics["max_memory_mb"] == 0.0
 
 
@@ -57,6 +60,7 @@ def test_training_result_has_required_artifacts() -> None:
         status="completed",
         final_loss=0.0,
         training_time_seconds=0.0,
+        time_per_step_seconds=0.0,
         max_memory_mb=0.0,
     )
 

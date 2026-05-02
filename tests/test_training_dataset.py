@@ -6,25 +6,24 @@ from datasets import Dataset, DatasetDict
 from omegaconf import OmegaConf
 
 from optimizer_comparison.data.dataset_loader import save_dataset_local
-from optimizer_comparison.training.trainer import (
-    load_final_training_dataset,
+from optimizer_comparison.training import training_loop as trainer_module
+from optimizer_comparison.training.training_loop import (
+    get_final_training_dataset,
     validate_final_training_dataset,
     validate_final_training_split,
 )
 
 
 # /**
-#  * Создает минимальный data-конфиг с final dataset path.
+#  * Создает минимальный полный конфиг с final dataset path.
 #  *
 #  * @param final_dir Локальная директория final dataset.
-#  * @return Hydra-like data-конфиг.
+#  * @return Hydra-like полный конфиг.
 #  */
-def make_data_config(final_dir: Path) -> Any:
+def make_config(final_dir: Path) -> Any:
     return OmegaConf.create(
         {
-            "final": {
-                "dir": str(final_dir),
-            },
+            "data": {"final": {"dir": str(final_dir)}},
         }
     )
 
@@ -59,12 +58,24 @@ def make_final_dataset() -> DatasetDict:
 #  * @param tmp_path Временная директория pytest.
 #  * @return None.
 #  */
-def test_load_final_training_dataset_loads_saved_dataset_dict(tmp_path: Path) -> None:
+def test_get_final_training_dataset_loads_saved_dataset_dict(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     final_dir = tmp_path / "final"
     save_dataset_local(dataset=make_final_dataset(), path=final_dir)
+    calls: list[Any] = []
 
-    dataset = load_final_training_dataset(make_data_config(final_dir))
+    monkeypatch.setattr(
+        trainer_module,
+        "run_data_pipeline",
+        lambda config: calls.append(config) or {},
+    )
 
+    config = make_config(final_dir)
+    dataset = get_final_training_dataset(config)
+
+    assert calls == [config]
     assert set(dataset.keys()) == {"train", "validation"}
     assert dataset["train"]["input_ids"] == [[1, 2, 3]]
     assert dataset["validation"]["attention_mask"] == [[1, 1, 1]]
@@ -76,9 +87,14 @@ def test_load_final_training_dataset_loads_saved_dataset_dict(tmp_path: Path) ->
 #  * @param tmp_path Временная директория pytest.
 #  * @return None.
 #  */
-def test_load_final_training_dataset_requires_existing_directory(tmp_path: Path) -> None:
+def test_get_final_training_dataset_requires_existing_directory(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(trainer_module, "run_data_pipeline", lambda config: {})
+
     with pytest.raises(FileNotFoundError, match="Final training dataset directory"):
-        load_final_training_dataset(make_data_config(tmp_path / "missing"))
+        get_final_training_dataset(make_config(tmp_path / "missing"))
 
 
 # /**
@@ -87,15 +103,19 @@ def test_load_final_training_dataset_requires_existing_directory(tmp_path: Path)
 #  * @param tmp_path Временная директория pytest.
 #  * @return None.
 #  */
-def test_load_final_training_dataset_rejects_plain_dataset(tmp_path: Path) -> None:
+def test_get_final_training_dataset_rejects_plain_dataset(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     final_dir = tmp_path / "final"
     save_dataset_local(
         dataset=Dataset.from_dict({"input_ids": [[1]], "attention_mask": [[1]]}),
         path=final_dir,
     )
+    monkeypatch.setattr(trainer_module, "run_data_pipeline", lambda config: {})
 
     with pytest.raises(TypeError, match="DatasetDict"):
-        load_final_training_dataset(make_data_config(final_dir))
+        get_final_training_dataset(make_config(final_dir))
 
 
 # /**

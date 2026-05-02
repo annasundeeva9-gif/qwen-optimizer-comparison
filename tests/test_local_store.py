@@ -51,7 +51,7 @@ def test_create_run_dir_uses_run_id(tmp_path: Path) -> None:
 def test_save_resolved_config_writes_yaml(tmp_path: Path) -> None:
     config = OmegaConf.create(
         {
-            "project": {"output_dir": str(tmp_path)},
+            "project": {"name": "optimizer-comparison"},
             "experiment": {"name": "mock_adamw"},
             "value": "${experiment.name}",
         }

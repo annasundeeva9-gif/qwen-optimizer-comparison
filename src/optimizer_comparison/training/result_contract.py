@@ -54,6 +54,7 @@ def build_empty_artifacts() -> dict[str, object]:
 #  * @param status Статус выполнения training-функции.
 #  * @param final_loss Итоговый loss, если он известен.
 #  * @param training_time_seconds Время обучения в секундах.
+#  * @param time_per_step_seconds Среднее время одного training step-а в секундах.
 #  * @param max_memory_mb Максимальная использованная память в мегабайтах.
 #  * @return Словарь training-result с вложенными metrics и artifacts.
 #  */
@@ -62,6 +63,7 @@ def build_training_result(
     status: str,
     final_loss: float | None,
     training_time_seconds: float | None,
+    time_per_step_seconds: float | None,
     max_memory_mb: float | None,
 ) -> TrainingResult:
     return {
@@ -72,6 +74,7 @@ def build_training_result(
         "metrics": {
             "final_loss": final_loss,
             "training_time_seconds": training_time_seconds,
+            "time_per_step_seconds": time_per_step_seconds,
             "max_memory_mb": max_memory_mb,
         },
         "history": [],

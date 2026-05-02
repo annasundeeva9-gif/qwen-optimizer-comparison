@@ -36,25 +36,42 @@ def test_tiny_qwen_model_config_uses_expected_hf_repo() -> None:
 
 
 # /**
-#  * Проверяет, что training config содержит базовые настройки HF Trainer без отдельной группы.
+#  * Проверяет, что training configs содержат общий protocol без выбора trainer path.
 #  *
 #  * @return None.
 #  */
-def test_training_config_contains_trainer_and_checkpoint_blocks() -> None:
+def test_training_configs_contain_shared_protocol_without_trainer_switch() -> None:
     root = Path(__file__).resolve().parents[1]
-    config = OmegaConf.load(root / "configs" / "training" / "default.yaml")
+    smoke_config = OmegaConf.load(root / "configs" / "training" / "smoke.yaml")
+    full_config = OmegaConf.load(root / "configs" / "training" / "full.yaml")
 
-    assert config.trainer.name == "hf_standard"
-    assert config.trainer.use_custom_optimizer is False
-    assert config.checkpoints.save_best is True
-    assert config.checkpoints.save_last is True
-    assert config.checkpoints.best_dir_name == "best"
-    assert config.checkpoints.last_dir_name == "last"
-    assert config.load_best_model_at_end is True
-    assert config.metric_for_best_model == "eval_loss"
-    assert config.eval_strategy == "steps"
-    assert config.save_strategy == "steps"
-    assert config.logging_strategy == "steps"
+    for config in (smoke_config, full_config):
+        assert "trainer" not in config
+        assert config.checkpoints.best_dir_name == "best"
+        assert config.checkpoints.last_dir_name == "last"
+        assert config.seed == 42
+        assert config.data_seed == 42
+        assert config.load_best_model_at_end is True
+        assert config.metric_for_best_model == "eval_loss"
+        assert config.eval_strategy == "steps"
+        assert config.save_strategy == "steps"
+        assert config.logging_strategy == "steps"
+        assert "lr_scheduler_type" in config
+        assert "warmup_ratio" in config
+        assert "max_grad_norm" in config
+
+
+# /**
+#  * Проверяет placeholder config для будущего combined optimizer path.
+#  *
+#  * @return None.
+#  */
+def test_combined_optimizer_config_is_pending_manual_integration() -> None:
+    root = Path(__file__).resolve().parents[1]
+    config = OmegaConf.load(root / "configs" / "optimizer" / "combined.yaml")
+
+    assert config.name == "combined"
+    assert config.implementation == "pending_manual_integration"
 
 
 # /**

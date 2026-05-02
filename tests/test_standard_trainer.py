@@ -7,8 +7,12 @@ from datasets import Dataset, DatasetDict
 from omegaconf import OmegaConf
 from pytest import MonkeyPatch
 
-from optimizer_comparison.training import trainer as trainer_module
-from optimizer_comparison.training.trainer import build_training_arguments, run_training
+from optimizer_comparison.training import training_loop as trainer_module
+from optimizer_comparison.training.training_loop import (
+    build_trainer,
+    build_training_arguments,
+    run_training,
+)
 
 
 # /**
@@ -27,7 +31,9 @@ class FakeTrainer:
     #  */
     def __init__(self) -> None:
         self.train_called = False
+        self.resume_from_checkpoint = None
         self.state = SimpleNamespace(
+            global_step=2,
             log_history=[
                 {"step": 1, "loss": 2.0, "learning_rate": 1e-5},
                 {"step": 2, "eval_loss": 1.5},
@@ -39,8 +45,9 @@ class FakeTrainer:
     #  *
     #  * @return Fake train output.
     #  */
-    def train(self) -> FakeTrainOutput:
+    def train(self, resume_from_checkpoint: str | None = None) -> FakeTrainOutput:
         self.train_called = True
+        self.resume_from_checkpoint = resume_from_checkpoint
         return FakeTrainOutput()
 
 
@@ -67,11 +74,19 @@ def make_config() -> Any:
     return OmegaConf.create(
         {
             "experiment": {"name": "smoke_adamw_tiny"},
-            "optimizer": {"name": "adamw"},
+            "optimizer": {
+                "name": "adamw",
+                "lr": 1e-4,
+                "weight_decay": 0.01,
+                "betas": [0.9, 0.95],
+                "eps": 1e-8,
+            },
             "data": {"final": {"dir": "unused"}},
             "model": {"name": "tiny_qwen_2_5"},
             "training": {
                 "num_train_epochs": 1,
+                "seed": 42,
+                "data_seed": 43,
                 "per_device_train_batch_size": 1,
                 "per_device_eval_batch_size": 1,
                 "gradient_accumulation_steps": 1,
@@ -92,6 +107,9 @@ def make_config() -> Any:
                 "dataloader_num_workers": 0,
                 "remove_unused_columns": False,
                 "report_to": [],
+                "lr_scheduler_type": "cosine",
+                "warmup_ratio": 0.03,
+                "max_grad_norm": 1.0,
                 "checkpoints": {
                     "best_dir_name": "best",
                     "last_dir_name": "last",
@@ -125,6 +143,16 @@ def test_build_training_arguments_uses_run_directory(tmp_path: Path) -> None:
     args = build_training_arguments(config=make_config(), run_dir=tmp_path)
 
     assert args.output_dir == str(tmp_path / "trainer_output")
+    assert args.learning_rate == 1e-4
+    assert args.weight_decay == 0.01
+    assert args.adam_beta1 == 0.9
+    assert args.adam_beta2 == 0.95
+    assert args.adam_epsilon == 1e-8
+    assert args.lr_scheduler_type.value == "cosine"
+    assert args.warmup_ratio == 0.03
+    assert args.max_grad_norm == 1.0
+    assert args.seed == 42
+    assert args.data_seed == 43
     assert args.per_device_train_batch_size == 1
     assert args.eval_strategy.value == "steps"
     assert args.save_strategy.value == "steps"
@@ -145,11 +173,8 @@ def test_run_training_returns_training_result_with_artifacts(
 ) -> None:
     fake_trainer = FakeTrainer()
 
-    monkeypatch.setattr(
-        trainer_module,
-        "load_final_training_dataset",
-        lambda config: make_dataset(),
-    )
+    monkeypatch.setattr(trainer_module, "get_final_training_dataset", lambda config: make_dataset())
+    monkeypatch.setattr(trainer_module, "set_seed", lambda seed: None)
     monkeypatch.setattr(trainer_module, "build_tokenizer", lambda config: FakeTokenizer())
     monkeypatch.setattr(trainer_module, "build_model", lambda config: object())
     monkeypatch.setattr(trainer_module.torch.cuda, "is_available", lambda: True)
@@ -189,6 +214,8 @@ def test_run_training_returns_training_result_with_artifacts(
     assert result["run_name"] == "smoke_adamw_tiny"
     assert result["metrics"]["final_loss"] == 1.25
     assert result["metrics"]["max_memory_mb"] == 12.5
+    assert isinstance(result["metrics"]["time_per_step_seconds"], float)
+    assert result["metrics"]["time_per_step_seconds"] > 0
     assert result["history"] == fake_trainer.state.log_history
     assert result["artifacts"]["model"]["local_path"] == str(tmp_path / "model")
     assert result["artifacts"]["tokenizer"]["local_path"] == str(tmp_path / "tokenizer")
@@ -201,17 +228,23 @@ def test_run_training_returns_training_result_with_artifacts(
 
 
 # /**
-#  * Проверяет, что standard trainer path явно отклоняет не-AdamW optimizer.
+#  * Проверяет, что Muon trainer path явно ожидает ручную интеграцию.
 #  *
 #  * @param tmp_path Временная директория pytest.
 #  * @return None.
 #  */
-def test_run_training_rejects_non_adamw_optimizer(tmp_path: Path) -> None:
+def test_build_trainer_rejects_pending_muon_optimizer(tmp_path: Path) -> None:
     config = make_config()
     config.optimizer.name = "muon"
 
-    with pytest.raises(NotImplementedError, match="MuonTrainer"):
-        run_training(config=config, run_dir=tmp_path)
+    with pytest.raises(NotImplementedError, match="Muon trainer"):
+        build_trainer(
+            config=config,
+            model=object(),
+            tokenizer=FakeTokenizer(),
+            dataset=make_dataset(),
+            run_dir=tmp_path,
+        )
 
 
 # /**
@@ -226,3 +259,59 @@ def test_run_training_requires_cuda(monkeypatch: MonkeyPatch, tmp_path: Path) ->
 
     with pytest.raises(RuntimeError, match="CUDA is required"):
         run_training(config=make_config(), run_dir=tmp_path)
+
+
+# /**
+#  * Проверяет, что run_training продолжает обучение из checkpoint-а существующего run-а.
+#  *
+#  * @param monkeypatch Инструмент pytest для подмены зависимостей.
+#  * @param tmp_path Временная директория pytest.
+#  * @return None.
+#  */
+def test_run_training_resumes_from_existing_checkpoint(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    fake_trainer = FakeTrainer()
+    checkpoint_dir = tmp_path / "trainer_output" / "checkpoint-7"
+    checkpoint_dir.mkdir(parents=True)
+    config = make_config()
+    config.training.resume_from_run_dir = str(tmp_path)
+
+    monkeypatch.setattr(trainer_module, "get_final_training_dataset", lambda config: make_dataset())
+    monkeypatch.setattr(trainer_module, "set_seed", lambda seed: None)
+    monkeypatch.setattr(trainer_module, "build_tokenizer", lambda config: FakeTokenizer())
+    monkeypatch.setattr(trainer_module, "build_model", lambda config: object())
+    monkeypatch.setattr(trainer_module.torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(trainer_module.torch.cuda, "reset_peak_memory_stats", lambda: None)
+    monkeypatch.setattr(
+        trainer_module.torch.cuda,
+        "max_memory_allocated",
+        lambda: int(12.5 * 1024 * 1024),
+    )
+    monkeypatch.setattr(
+        trainer_module,
+        "build_standard_trainer",
+        lambda **kwargs: fake_trainer,
+    )
+    monkeypatch.setattr(
+        trainer_module,
+        "save_best_and_last_checkpoints",
+        lambda **kwargs: {
+            "local_path": str(tmp_path / "checkpoints"),
+            "best_path": str(tmp_path / "checkpoints" / "best"),
+            "last_path": str(tmp_path / "checkpoints" / "last"),
+        },
+    )
+    monkeypatch.setattr(
+        trainer_module,
+        "save_final_model_artifacts",
+        lambda **kwargs: {
+            "model_path": str(tmp_path / "model"),
+            "tokenizer_path": str(tmp_path / "tokenizer"),
+        },
+    )
+
+    run_training(config=config, run_dir=tmp_path)
+
+    assert fake_trainer.resume_from_checkpoint == str(checkpoint_dir)

@@ -343,7 +343,8 @@ def persist_training_artifacts_to_hf(
             warnings.warn(f"HF Hub upload failed: {error}", RuntimeWarning, stacklevel=2)
             return result
 
-    cleanup_local_checkpoint_artifacts(result)
+    if bool(config.artifacts.get("cleanup_checkpoints_after_hf_upload", True)):
+        cleanup_local_checkpoint_artifacts(result)
 
     return result
 

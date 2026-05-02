@@ -13,7 +13,7 @@ from pytest import MonkeyPatch
 #  */
 def load_script_module() -> ModuleType:
     root = Path(__file__).resolve().parents[1]
-    script_path = root / "scripts" / "upload_mlflow_snapshot.py"
+    script_path = root / "scripts" / "workflows" / "upload_mlflow_snapshot.py"
     spec = importlib.util.spec_from_file_location("upload_mlflow_snapshot", script_path)
     if spec is None or spec.loader is None:
         raise RuntimeError("Cannot load upload_mlflow_snapshot.py")

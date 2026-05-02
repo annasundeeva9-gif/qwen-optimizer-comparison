@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import hydra
-from datasets import Dataset, DatasetDict
+from datasets import Dataset, DatasetDict  # type: ignore[import-untyped]
 from omegaconf import DictConfig
 
 from optimizer_comparison.data.chunking import load_or_chunk_splits

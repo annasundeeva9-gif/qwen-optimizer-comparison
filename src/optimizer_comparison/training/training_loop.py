@@ -1,4 +1,4 @@
-"""Training loop skeleton."""
+"""Training loop implementation."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import torch
-from datasets import Dataset, DatasetDict
+from datasets import Dataset, DatasetDict  # type: ignore[import-untyped]
 from omegaconf import DictConfig
 from transformers import DataCollatorForLanguageModeling, Trainer, TrainingArguments
 from transformers.trainer_utils import get_last_checkpoint
@@ -17,12 +17,56 @@ from optimizer_comparison.data.dataset_loader import (
     dataset_local_path_exists,
     load_dataset_local,
 )
+from optimizer_comparison.data.prepare_data import run_data_pipeline
 from optimizer_comparison.models.build_model import build_model
 from optimizer_comparison.models.tokenization import build_tokenizer
 from optimizer_comparison.training.result_contract import TrainingResult, build_training_result
+from optimizer_comparison.training.seed import set_seed
 
 REQUIRED_FINAL_SPLITS: tuple[str, ...] = ("train", "validation")
 REQUIRED_FINAL_COLUMNS: tuple[str, ...] = ("input_ids", "attention_mask")
+
+
+# /**
+#  * Возвращает последний checkpoint Trainer-а с явным типом для strict mypy.
+#  *
+#  * @param output_dir Директория output_dir из TrainingArguments.
+#  * @return Путь к последнему checkpoint-у или None, если checkpoint не найден.
+#  */
+def find_last_checkpoint(output_dir: Path) -> str | None:
+    if not output_dir.exists():
+        return None
+    checkpoint = get_last_checkpoint(str(output_dir))  # type: ignore[no-untyped-call]
+    if checkpoint is None:
+        return None
+    return str(checkpoint)
+
+
+# /**
+#  * Возвращает checkpoint для resume существующего training run-а.
+#  *
+#  * @param run_dir Директория существующего run-а.
+#  * @return Путь к последнему checkpoint-у в trainer_output.
+#  */
+def find_resume_checkpoint(run_dir: str | Path) -> str:
+    output_dir = Path(run_dir) / "trainer_output"
+    checkpoint = find_last_checkpoint(output_dir)
+    if checkpoint is None:
+        raise FileNotFoundError(f"No trainer checkpoint found for resume: {output_dir}")
+    return checkpoint
+
+
+# /**
+#  * Возвращает best checkpoint Trainer-а с явным типом для strict mypy.
+#  *
+#  * @param trainer HuggingFace Trainer после завершения train().
+#  * @return Путь к best checkpoint-у или None, если Trainer его не выбрал.
+#  */
+def get_best_checkpoint(trainer: Trainer) -> str | None:
+    checkpoint = trainer.state.best_model_checkpoint
+    if checkpoint is None:
+        return None
+    return checkpoint
 
 
 # /**
@@ -62,13 +106,14 @@ def validate_final_training_dataset(dataset: DatasetDict) -> None:
 
 
 # /**
-#  * Загружает final DatasetDict, подготовленный data pipeline, для training loop.
+#  * Возвращает final DatasetDict, при необходимости запуская data pipeline.
 #  *
-#  * @param config Полная data-секция Hydra-конфига с полем final.dir.
-#  * @return DatasetDict с train и validation split-ами без изменения содержимого.
+#  * @param config Полный Hydra-конфиг training run-а.
+#  * @return DatasetDict с train и validation split-ами.
 #  */
-def load_final_training_dataset(config: DictConfig) -> DatasetDict:
-    final_dir = str(config.final.dir)
+def get_final_training_dataset(config: DictConfig) -> DatasetDict:
+    run_data_pipeline(config)
+    final_dir = str(config.data.final.dir)
     if not dataset_local_path_exists(final_dir):
         raise FileNotFoundError(f"Final training dataset directory does not exist: {final_dir}")
 
@@ -88,11 +133,25 @@ def load_final_training_dataset(config: DictConfig) -> DatasetDict:
 #  */
 def build_training_arguments(config: DictConfig, run_dir: str | Path) -> TrainingArguments:
     training_config = config.training
+    optimizer_config = config.optimizer
+    adam_betas = list(optimizer_config.betas)
+    if len(adam_betas) != 2:
+        raise ValueError("AdamW optimizer config must define exactly two beta values.")
     output_dir = Path(run_dir) / "trainer_output"
 
     return TrainingArguments(
         output_dir=str(output_dir),
         num_train_epochs=float(training_config.num_train_epochs),
+        learning_rate=float(optimizer_config.lr),
+        weight_decay=float(optimizer_config.weight_decay),
+        adam_beta1=float(adam_betas[0]),
+        adam_beta2=float(adam_betas[1]),
+        adam_epsilon=float(optimizer_config.eps),
+        lr_scheduler_type=str(training_config.lr_scheduler_type),
+        warmup_ratio=float(training_config.warmup_ratio),
+        max_grad_norm=float(training_config.max_grad_norm),
+        seed=int(training_config.seed),
+        data_seed=int(training_config.data_seed),
         per_device_train_batch_size=int(training_config.per_device_train_batch_size),
         per_device_eval_batch_size=int(training_config.per_device_eval_batch_size),
         gradient_accumulation_steps=int(training_config.gradient_accumulation_steps),
@@ -145,6 +204,91 @@ def build_standard_trainer(
         processing_class=tokenizer,
     )
 
+
+# /**
+#  * Создает Muon trainer, когда ручная интеграция Muon будет добавлена.
+#  *
+#  * @param config Полный Hydra-конфиг запуска.
+#  * @param model Загруженная causal language model.
+#  * @param tokenizer Загруженный tokenizer.
+#  * @param dataset Final DatasetDict с train и validation split-ами.
+#  * @param run_dir Директория конкретного запуска.
+#  * @return HuggingFace Trainer с Muon optimizer path.
+#  */
+def build_muon_trainer(
+    config: DictConfig,
+    model: Any,
+    tokenizer: Any,
+    dataset: DatasetDict,
+    run_dir: str | Path,
+) -> Trainer:
+    raise NotImplementedError("Muon trainer is pending manual integration.")
+
+
+# /**
+#  * Создает combined AdamW/Muon trainer, когда этот режим будет добавлен.
+#  *
+#  * @param config Полный Hydra-конфиг запуска.
+#  * @param model Загруженная causal language model.
+#  * @param tokenizer Загруженный tokenizer.
+#  * @param dataset Final DatasetDict с train и validation split-ами.
+#  * @param run_dir Директория конкретного запуска.
+#  * @return HuggingFace Trainer с combined optimizer path.
+#  */
+def build_combined_trainer(
+    config: DictConfig,
+    model: Any,
+    tokenizer: Any,
+    dataset: DatasetDict,
+    run_dir: str | Path,
+) -> Trainer:
+    raise NotImplementedError("Combined trainer is pending manual integration.")
+
+
+# /**
+#  * Выбирает trainer path по единственному пользовательскому переключателю optimizer.name.
+#  *
+#  * @param config Полный Hydra-конфиг запуска.
+#  * @param model Загруженная causal language model.
+#  * @param tokenizer Загруженный tokenizer.
+#  * @param dataset Final DatasetDict с train и validation split-ами.
+#  * @param run_dir Директория конкретного запуска.
+#  * @return Trainer, соответствующий выбранному optimizer mode.
+#  */
+def build_trainer(
+    config: DictConfig,
+    model: Any,
+    tokenizer: Any,
+    dataset: DatasetDict,
+    run_dir: str | Path,
+) -> Trainer:
+    optimizer_name = str(config.optimizer.name).lower()
+    if optimizer_name == "adamw":
+        return build_standard_trainer(
+            config=config,
+            model=model,
+            tokenizer=tokenizer,
+            dataset=dataset,
+            run_dir=run_dir,
+        )
+    if optimizer_name == "muon":
+        return build_muon_trainer(
+            config=config,
+            model=model,
+            tokenizer=tokenizer,
+            dataset=dataset,
+            run_dir=run_dir,
+        )
+    if optimizer_name == "combined":
+        return build_combined_trainer(
+            config=config,
+            model=model,
+            tokenizer=tokenizer,
+            dataset=dataset,
+            run_dir=run_dir,
+        )
+    raise NotImplementedError(f"Unsupported optimizer for training: {optimizer_name}")
+
 # /**
 #  * Копирует checkpoint directory в стабильную best/last директорию run-а.
 #  *
@@ -181,9 +325,9 @@ def save_best_and_last_checkpoints(
     best_dir = checkpoints_dir / str(config.training.checkpoints.best_dir_name)
     last_dir = checkpoints_dir / str(config.training.checkpoints.last_dir_name)
 
-    output_dir = Path(trainer.args.output_dir)
-    last_checkpoint = get_last_checkpoint(str(output_dir)) if output_dir.exists() else None
-    best_checkpoint = trainer.state.best_model_checkpoint
+    output_dir = Path(str(trainer.args.output_dir))
+    last_checkpoint = find_last_checkpoint(output_dir)
+    best_checkpoint = get_best_checkpoint(trainer)
 
     if last_checkpoint is not None:
         copy_checkpoint_dir(source_dir=last_checkpoint, target_dir=last_dir)
@@ -237,21 +381,16 @@ def save_final_model_artifacts(
 #  * @return Training-result в общем формате с метриками и путями к артефактам.
 #  */
 def run_training(config: DictConfig, run_dir: str | Path) -> TrainingResult:
-    optimizer_name = str(config.optimizer.name)
-    if optimizer_name == "muon":
-        raise NotImplementedError("MuonTrainer is pending manual integration.")
-    if optimizer_name != "adamw":
-        raise NotImplementedError(f"Unsupported optimizer for training: {optimizer_name}")
-
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA is required for real training runs.")
+    set_seed(int(config.training.seed))
     torch.cuda.reset_peak_memory_stats()
 
     start_time = time.perf_counter()
-    dataset = load_final_training_dataset(config.data)
+    dataset = get_final_training_dataset(config)
     tokenizer = build_tokenizer(config.model)
     model = build_model(config.model)
-    trainer = build_standard_trainer(
+    trainer = build_trainer(
         config=config,
         model=model,
         tokenizer=tokenizer,
@@ -259,8 +398,27 @@ def run_training(config: DictConfig, run_dir: str | Path) -> TrainingResult:
         run_dir=run_dir,
     )
 
-    train_output = trainer.train()
+    resume_from_run_dir = config.training.get("resume_from_run_dir", None)
+    resume_checkpoint = (
+        find_resume_checkpoint(run_dir)
+        if resume_from_run_dir is not None
+        else None
+    )
+    train_output = trainer.train(resume_from_checkpoint=resume_checkpoint)
     training_time_seconds = time.perf_counter() - start_time
+    completed_steps = getattr(trainer.state, "global_step", None)
+    if not isinstance(completed_steps, int) or completed_steps <= 0:
+        completed_steps = max(
+            (
+                int(entry["step"])
+                for entry in trainer.state.log_history
+                if isinstance(entry, dict) and isinstance(entry.get("step"), int)
+            ),
+            default=0,
+        )
+    time_per_step_seconds = (
+        training_time_seconds / completed_steps if completed_steps > 0 else None
+    )
 
     checkpoint_paths = save_best_and_last_checkpoints(
         trainer=trainer,
@@ -283,6 +441,7 @@ def run_training(config: DictConfig, run_dir: str | Path) -> TrainingResult:
             else float(train_output.training_loss)
         ),
         training_time_seconds=training_time_seconds,
+        time_per_step_seconds=time_per_step_seconds,
         max_memory_mb=float(torch.cuda.max_memory_allocated() / (1024 * 1024)),
     )
 

@@ -11,7 +11,7 @@ from typing import Any
 #  */
 def load_script_module() -> ModuleType:
     root = Path(__file__).resolve().parents[1]
-    script_path = root / "scripts" / "upload_hf_artifact.py"
+    script_path = root / "scripts" / "workflows" / "upload_hf_artifact.py"
     spec = importlib.util.spec_from_file_location("upload_hf_artifact", script_path)
     if spec is None or spec.loader is None:
         raise RuntimeError("Cannot load upload_hf_artifact.py")

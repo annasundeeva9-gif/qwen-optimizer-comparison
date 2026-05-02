@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import os
-from typing import Any
+from typing import Any, cast
 
-from datasets import Dataset, DatasetDict
+from datasets import Dataset, DatasetDict  # type: ignore[import-untyped]
 from omegaconf import DictConfig
 
 from optimizer_comparison.data.dataset_loader import (
@@ -42,11 +42,14 @@ def tokenize_dataset(dataset: Dataset, tokenizer: Any, config: DictConfig) -> Da
         raise ValueError(f"Dataset does not contain text column: {text_column}")
 
     def tokenize_batch(batch: dict[str, list[str]]) -> dict[str, Any]:
-        return tokenizer(
-            batch[text_column],
-            padding=False,
-            truncation=False,
-            add_special_tokens=False,
+        return cast(
+            dict[str, Any],
+            tokenizer(
+                batch[text_column],
+                padding=False,
+                truncation=False,
+                add_special_tokens=False,
+            ),
         )
 
     map_kwargs: dict[str, Any] = {

@@ -3,15 +3,27 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
-from datasets import Dataset, DatasetDict, load_from_disk
-from datasets import load_dataset as hf_load_dataset
+from datasets import (  # type: ignore[import-untyped]
+    load_dataset as hf_load_dataset,
+)
+from datasets import (
+    load_from_disk,
+)
 from omegaconf import DictConfig
 
 from optimizer_comparison.artifacts.local_store import resolve_project_path
 
-LocalDataset = Dataset | DatasetDict
+
+class LocalDataset(Protocol):
+    # /**
+    #  * Сохраняет dataset в формате HuggingFace Datasets.
+    #  *
+    #  * @param dataset_path Целевая директория.
+    #  * @return None.
+    #  */
+    def save_to_disk(self, dataset_path: str) -> None: ...
 
 # /**
 #  * Проверяет, похожа ли директория на сохраненный локальный датасет.

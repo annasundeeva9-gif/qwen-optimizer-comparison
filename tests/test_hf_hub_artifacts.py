@@ -71,6 +71,7 @@ def make_config(use: bool) -> Any:
             "mode": {"name": "full"},
             "experiment": {"name": "adamw_baseline"},
             "artifacts": {
+                "cleanup_checkpoints_after_hf_upload": True,
                 "hf_hub": {
                     "use": use,
                     "repo_id": "user/repo",
@@ -138,6 +139,7 @@ def make_result(tmp_path: Path) -> dict[str, object]:
         status="completed",
         final_loss=1.0,
         training_time_seconds=10.0,
+        time_per_step_seconds=1.0,
         max_memory_mb=100.0,
     )
     run_id = "adamw_baseline__2026-04-29_10-00-00"
@@ -284,6 +286,38 @@ def test_persist_training_artifacts_writes_metadata(
     assert artifacts["checkpoints"]["local_path"] is None
     assert not (tmp_path / "adamw_baseline__2026-04-29_10-00-00" / "checkpoints").exists()
     assert not (tmp_path / "adamw_baseline__2026-04-29_10-00-00" / "trainer_output").exists()
+
+
+# /**
+#  * Проверяет, что cleanup после HF upload можно отключить конфигом.
+#  *
+#  * @param monkeypatch Инструмент pytest для подмены upload.
+#  * @param tmp_path Временная директория pytest.
+#  * @return None.
+#  */
+def test_persist_training_artifacts_can_keep_checkpoints_after_upload(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("HF_TOKEN", "token")
+    monkeypatch.setattr(
+        hf_hub,
+        "upload_path_to_hf",
+        lambda **kwargs: {
+            "commit_url": "https://huggingface.co/user/repo/commit/abc",
+            "revision": "abc",
+        },
+    )
+    config = make_config(use=True)
+    config.artifacts.cleanup_checkpoints_after_hf_upload = False
+
+    result = persist_training_artifacts_to_hf(config=config, result=make_result(tmp_path))
+
+    artifacts = result["artifacts"]
+    assert artifacts["hf_hub"]["upload_status"] == "completed"
+    assert artifacts["checkpoints"]["cleanup_status"] == "not_applicable"
+    assert (tmp_path / "adamw_baseline__2026-04-29_10-00-00" / "checkpoints").is_dir()
+    assert (tmp_path / "adamw_baseline__2026-04-29_10-00-00" / "trainer_output").is_dir()
 
 
 # /**

@@ -3,7 +3,7 @@ defaults:
   - mode: mock
   - model: mock
   - optimizer: adamw
-  - training: default
+  - training: smoke
   - evaluation: lm_eval
   - tracking: mlflow
   - experiment: mock_adamw
@@ -11,12 +11,12 @@ defaults:
 
 project:
   name: optimizer-comparison
-  output_dir: outputs
 
 artifacts:
   root_dir: outputs/runs
   config_filename: config.yaml
   result_filename: result.json
+  cleanup_checkpoints_after_hf_upload: true
   hf_hub:
     use: false
     repo_id: null

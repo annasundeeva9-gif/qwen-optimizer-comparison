@@ -38,13 +38,24 @@ def test_collect_training_params_returns_expected_keys() -> None:
                 "name": "mock",
                 "pretrained_name_or_path": None,
             },
-            "optimizer": {"name": "adamw"},
+            "optimizer": {
+                "name": "adamw",
+                "lr": 1e-4,
+                "weight_decay": 0.01,
+                "betas": [0.9, 0.95],
+                "eps": 1e-8,
+            },
             "experiment": {"name": "mock_adamw"},
             "data": {"split": {"seed": 42}},
             "training": {
+                "seed": 42,
+                "data_seed": 43,
                 "num_train_epochs": 1,
                 "per_device_train_batch_size": 1,
                 "gradient_accumulation_steps": 1,
+                "lr_scheduler_type": "cosine",
+                "warmup_ratio": 0.03,
+                "max_grad_norm": 1.0,
                 "max_steps": None,
             },
         }
@@ -56,8 +67,17 @@ def test_collect_training_params_returns_expected_keys() -> None:
     assert params["mode.name"] == "mock"
     assert params["model.name"] == "mock"
     assert params["optimizer.name"] == "adamw"
+    assert params["optimizer.lr"] == "0.0001"
+    assert params["optimizer.weight_decay"] == "0.01"
+    assert params["optimizer.betas"] == "[0.9, 0.95]"
+    assert params["optimizer.eps"] == "1e-08"
     assert params["experiment.name"] == "mock_adamw"
     assert params["data.split.seed"] == "42"
+    assert params["training.seed"] == "42"
+    assert params["training.data_seed"] == "43"
+    assert params["training.lr_scheduler_type"] == "cosine"
+    assert params["training.warmup_ratio"] == "0.03"
+    assert params["training.max_grad_norm"] == "1.0"
     assert "training.max_steps" not in params
 
 
@@ -80,7 +100,7 @@ def test_log_training_history_logs_step_metrics(monkeypatch) -> None:
     log_training_history(
         {
             "history": [
-                {"step": 1, "loss": 2.0, "learning_rate": 0.0001},
+                {"step": 1, "loss": 2.0, "learning_rate": 0.0001, "grad_norm": 0.3},
                 {"step": 2, "eval_loss": 1.5},
                 {"loss": 9.0},
             ]
@@ -90,6 +110,7 @@ def test_log_training_history_logs_step_metrics(monkeypatch) -> None:
     assert logged_metrics == [
         ("train/loss", 2.0, 1),
         ("train/learning_rate", 0.0001, 1),
+        ("train/grad_norm", 0.3, 1),
         ("eval/loss", 1.5, 2),
     ]
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import hydra
 from omegaconf import DictConfig
 
@@ -11,6 +13,7 @@ from optimizer_comparison.artifacts.hf_hub import (
 )
 from optimizer_comparison.artifacts.local_store import (
     create_run_dir,
+    resolve_project_path,
     save_json,
     save_resolved_config,
 )
@@ -20,7 +23,33 @@ from optimizer_comparison.tracking.mlflow_logger import (
 )
 from optimizer_comparison.training.mock_trainer import run_mock_training
 from optimizer_comparison.training.result_contract import set_local_artifact_paths
-from optimizer_comparison.training.trainer import run_training
+from optimizer_comparison.training.training_loop import run_training
+
+
+# /**
+#  * Возвращает директорию run-а для нового training или resume существующего run-а.
+#  *
+#  * @param config Полная конфигурация запуска.
+#  * @param artifacts_root_dir Корневая директория локальных run artifacts.
+#  * @param experiment_name Имя эксперимента для нового run-а.
+#  * @return Директория run-а.
+#  */
+def resolve_training_run_dir(
+    config: DictConfig,
+    artifacts_root_dir: str,
+    experiment_name: str,
+) -> Path:
+    resume_from_run_dir = config.training.get("resume_from_run_dir", None)
+    if resume_from_run_dir is None:
+        return create_run_dir(
+            artifacts_root_dir=artifacts_root_dir,
+            experiment_name=experiment_name,
+        )
+
+    run_dir = resolve_project_path(str(resume_from_run_dir))
+    if not run_dir.is_dir():
+        raise FileNotFoundError(f"Resume run directory does not exist: {run_dir}")
+    return run_dir
 
 
 # /**
@@ -38,7 +67,8 @@ def main(config: DictConfig) -> None:
     config_filename = str(config.artifacts.config_filename)
     result_filename = str(config.artifacts.result_filename)
 
-    run_dir = create_run_dir(
+    run_dir = resolve_training_run_dir(
+        config=config,
         artifacts_root_dir=artifacts_root_dir,
         experiment_name=experiment_name,
     )

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datasets import Dataset, DatasetDict
+from datasets import Dataset, DatasetDict  # type: ignore[import-untyped]
 from omegaconf import DictConfig
 
 from optimizer_comparison.data.dataset_loader import (

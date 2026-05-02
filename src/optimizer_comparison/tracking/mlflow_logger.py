@@ -49,8 +49,14 @@ def collect_training_params(config: DictConfig) -> dict[str, str]:
         "model.name": config.get("model", {}).get("name"),
         "model.pretrained_name_or_path": config.get("model", {}).get("pretrained_name_or_path"),
         "optimizer.name": config.get("optimizer", {}).get("name"),
+        "optimizer.lr": config.get("optimizer", {}).get("lr"),
+        "optimizer.weight_decay": config.get("optimizer", {}).get("weight_decay"),
+        "optimizer.betas": config.get("optimizer", {}).get("betas"),
+        "optimizer.eps": config.get("optimizer", {}).get("eps"),
         "experiment.name": config.get("experiment", {}).get("name"),
         "data.split.seed": config.get("data", {}).get("split", {}).get("seed"),
+        "training.seed": config.get("training", {}).get("seed"),
+        "training.data_seed": config.get("training", {}).get("data_seed"),
         "training.num_train_epochs": config.get("training", {}).get("num_train_epochs"),
         "training.per_device_train_batch_size": config.get("training", {}).get(
             "per_device_train_batch_size"
@@ -58,6 +64,9 @@ def collect_training_params(config: DictConfig) -> dict[str, str]:
         "training.gradient_accumulation_steps": config.get("training", {}).get(
             "gradient_accumulation_steps"
         ),
+        "training.lr_scheduler_type": config.get("training", {}).get("lr_scheduler_type"),
+        "training.warmup_ratio": config.get("training", {}).get("warmup_ratio"),
+        "training.max_grad_norm": config.get("training", {}).get("max_grad_norm"),
         "training.max_steps": config.get("training", {}).get("max_steps"),
     }
 
@@ -104,6 +113,7 @@ def log_training_history(training_result: TrainingResult) -> None:
     metric_names = {
         "loss": "train/loss",
         "learning_rate": "train/learning_rate",
+        "grad_norm": "train/grad_norm",
         "eval_loss": "eval/loss",
     }
     for entry in history:
@@ -186,7 +196,7 @@ def log_training_run(config: DictConfig, training_result: TrainingResult) -> str
         log_training_history(training_result)
         log_hf_hub_tags(training_result)
 
-        return active_run.info.run_id
+        return str(active_run.info.run_id)
 
 
 # /**
