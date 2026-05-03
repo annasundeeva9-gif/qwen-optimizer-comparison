@@ -1,0 +1,6 @@
+name: smoke_muon_tiny
+description: "Smoke run with tiny Qwen2.5 model and Muon."
+tags:
+  stage: smoke
+  optimizer: muon
+  model: tiny_qwen_2_5

@@ -11,6 +11,8 @@ from optimizer_comparison.artifacts.local_store import resolve_project_path
 from optimizer_comparison.evaluation.result_parser import parse_lm_eval_results
 from optimizer_comparison.training.result_contract import TrainingResult
 
+MLFLOW_EXPERIMENT_ID = "0"
+
 
 # /**
 #  * Проверяет, включен ли MLflow tracking в полном Hydra-конфиге.
@@ -33,7 +35,6 @@ def setup_mlflow(config: DictConfig) -> None:
     tracking_uri = resolve_project_path(str(tracking_config.tracking_uri))
 
     mlflow.set_tracking_uri(tracking_uri.as_uri())
-    mlflow.set_experiment(str(tracking_config.experiment_name))
 
 
 # /**
@@ -207,7 +208,7 @@ def log_training_run(config: DictConfig, training_result: TrainingResult) -> str
     setup_mlflow(config)
 
     run_name = str(training_result.get("run_name", config.get("experiment", {}).get("name", "run")))
-    with mlflow.start_run(run_name=run_name) as active_run:
+    with mlflow.start_run(experiment_id=MLFLOW_EXPERIMENT_ID, run_name=run_name) as active_run:
         log_run_config(config)
         mlflow.set_tag("run.status", str(training_result.get("status", "unknown")))
         mlflow.set_tag("project.run_id", str(training_result.get("run_id", "")))
@@ -325,7 +326,7 @@ def log_evaluation_run(config: DictConfig, evaluation_result: dict[str, Any]) ->
 
     if mlflow_run_id is None:
         run_name = str(evaluation_result.get("run_name", "evaluation"))
-        with mlflow.start_run(run_name=run_name) as active_run:
+        with mlflow.start_run(experiment_id=MLFLOW_EXPERIMENT_ID, run_name=run_name) as active_run:
             log_evaluation_metrics(parsed_lm_eval_result)
             log_evaluation_tags(evaluation_result)
             log_evaluation_artifacts(evaluation_result)

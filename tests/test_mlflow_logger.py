@@ -5,6 +5,7 @@ from omegaconf import OmegaConf
 
 from optimizer_comparison.evaluation.model_source import BASE_QWEN_MODEL_ID, BASE_QWEN_RUN_NAME
 from optimizer_comparison.tracking.mlflow_logger import (
+    MLFLOW_EXPERIMENT_ID,
     collect_training_params,
     is_tracking_enabled,
     log_custom_artifacts,
@@ -323,7 +324,7 @@ def test_log_evaluation_run_creates_run_for_base_model(monkeypatch, tmp_path: Pa
         json.dumps({"results": {"piqa": {"acc,none": 0.75}}}),
         encoding="utf-8",
     )
-    started_run_names: list[str] = []
+    started_runs: list[tuple[str, str]] = []
     logged_tags: list[dict[str, str]] = []
 
     class FakeRun:
@@ -336,8 +337,8 @@ def test_log_evaluation_run_creates_run_for_base_model(monkeypatch, tmp_path: Pa
         def __exit__(self, exc_type, exc_value, traceback):
             return False
 
-    def fake_start_run(run_name: str):
-        started_run_names.append(run_name)
+    def fake_start_run(experiment_id: str, run_name: str):
+        started_runs.append((experiment_id, run_name))
         return FakeRun()
 
     monkeypatch.setattr(
@@ -385,7 +386,7 @@ def test_log_evaluation_run_creates_run_for_base_model(monkeypatch, tmp_path: Pa
     )
 
     assert mlflow_run_id == "new-base-run-id"
-    assert started_run_names == [BASE_QWEN_RUN_NAME]
+    assert started_runs == [(MLFLOW_EXPERIMENT_ID, BASE_QWEN_RUN_NAME)]
     assert logged_tags == [
         {
             "evaluation.status": "completed",

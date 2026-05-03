@@ -84,7 +84,7 @@ fi
 if [[ "${MODE}" == "mock" ]]; then
   EXPERIMENT_CONFIG="mock_adamw"
 elif [[ "${MODE}" == "smoke" ]]; then
-  EXPERIMENT_CONFIG="smoke_adamw_tiny"
+  EXPERIMENT_CONFIG="smoke_${OPTIMIZER}_tiny"
 else
   EXPERIMENT_CONFIG="${OPTIMIZER}_baseline"
 fi

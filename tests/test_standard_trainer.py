@@ -120,6 +120,30 @@ def make_config() -> Any:
 
 
 # /**
+#  * Создает минимальную Muon optimizer config для build_trainer-тестов.
+#  *
+#  * @return Hydra-like optimizer config.
+#  */
+def make_muon_optimizer_config() -> Any:
+    return OmegaConf.create(
+        {
+            "name": "muon",
+            "lr": 1e-3,
+            "weight_decay": 0.1,
+            "muon_layer_count": 2,
+            "muon_param_patterns": [
+                "model.layers.{layer}.self_attn.q_proj.weight",
+            ],
+            "momentum": 0.95,
+            "nesterov": True,
+            "ns_steps": 5,
+            "adamw_betas": [0.9, 0.95],
+            "adamw_eps": 1e-8,
+        }
+    )
+
+
+# /**
 #  * Создает минимальный final DatasetDict для fake standard trainer.
 #  *
 #  * @return DatasetDict с train и validation split-ами.
@@ -228,23 +252,38 @@ def test_run_training_returns_training_result_with_artifacts(
 
 
 # /**
-#  * Проверяет, что Muon trainer path явно ожидает ручную интеграцию.
+#  * Проверяет, что Muon trainer path создает MuonTrainer.
 #  *
+#  * @param monkeypatch Инструмент pytest для подмены MuonTrainer.
 #  * @param tmp_path Временная директория pytest.
 #  * @return None.
 #  */
-def test_build_trainer_rejects_pending_muon_optimizer(tmp_path: Path) -> None:
+def test_build_trainer_creates_muon_trainer(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     config = make_config()
-    config.optimizer.name = "muon"
+    config.optimizer = make_muon_optimizer_config()
+    created_kwargs: dict[str, Any] = {}
 
-    with pytest.raises(NotImplementedError, match="Muon trainer"):
-        build_trainer(
-            config=config,
-            model=object(),
-            tokenizer=FakeTokenizer(),
-            dataset=make_dataset(),
-            run_dir=tmp_path,
-        )
+    class FakeMuonTrainer:
+        def __init__(self, **kwargs: Any) -> None:
+            created_kwargs.update(kwargs)
+
+    monkeypatch.setattr(trainer_module, "MuonTrainer", FakeMuonTrainer)
+
+    trainer = build_trainer(
+        config=config,
+        model=object(),
+        tokenizer=FakeTokenizer(),
+        dataset=make_dataset(),
+        run_dir=tmp_path,
+    )
+
+    assert isinstance(trainer, FakeMuonTrainer)
+    assert created_kwargs["optimizer_config"] == config.optimizer
+    assert created_kwargs["args"].learning_rate == 1e-3
+    assert created_kwargs["args"].weight_decay == 0.1
 
 
 # /**

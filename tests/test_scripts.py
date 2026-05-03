@@ -24,6 +24,7 @@ def test_main_train_script_accepts_optimizer_argument() -> None:
     assert '"training=${TRAINING}"' in script
     assert 'OPTIMIZER="$(echo "${OPTIMIZER}" | tr' in script
     assert '"optimizer=${OPTIMIZER}"' in script
+    assert 'EXPERIMENT_CONFIG="smoke_${OPTIMIZER}_tiny"' in script
     assert 'EXPERIMENT_CONFIG="${OPTIMIZER}_baseline"' in script
     assert '"experiment=${EXPERIMENT_CONFIG}"' in script
     assert '"experiment.name=${EXPERIMENT}"' in script
@@ -67,6 +68,7 @@ def test_main_train_eval_script_runs_train_then_eval() -> None:
     assert "--hf-repo-id" in script
     assert "artifacts.hf_hub.use=true" in script
     assert '"training=${TRAINING}"' in script
+    assert 'EXPERIMENT_CONFIG="smoke_${OPTIMIZER}_tiny"' in script
     assert '"experiment=${EXPERIMENT_CONFIG}"' in script
     assert '"experiment.name=${EXPERIMENT}"' in script
     assert "RUN_DIR=\"$(ls -td " in script
@@ -91,8 +93,13 @@ def test_workflow_smoke_script_uses_tiny_qwen_model() -> None:
     assert "--hf-repo-id" in script
     assert "--mode smoke" in script
     assert "--model tiny_qwen_2_5" in script
-    assert "--optimizer adamw" in script
-    assert "--experiment smoke_adamw_tiny" in script
+    assert 'OPTIMIZER="adamw"' in script
+    assert 'EXPERIMENT="smoke_adamw_tiny"' in script
+    assert "optimizer=*)" in script
+    assert "experiment.name=*)" in script
+    assert '--optimizer "${OPTIMIZER}"' in script
+    assert '--experiment "${EXPERIMENT}"' in script
+    assert '"experiment.tags.optimizer=${OPTIMIZER}"' in script
     assert "data.final.dir=outputs/datasets/final/openwebtext_100k_smoke" in script
 
 

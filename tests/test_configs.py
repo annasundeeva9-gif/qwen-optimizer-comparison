@@ -75,6 +75,51 @@ def test_combined_optimizer_config_is_pending_manual_integration() -> None:
 
 
 # /**
+#  * Проверяет smoke experiment config для Muon.
+#  *
+#  * @return None.
+#  */
+def test_smoke_muon_experiment_config_uses_muon_tag() -> None:
+    root = Path(__file__).resolve().parents[1]
+    config = OmegaConf.load(root / "configs" / "experiment" / "smoke_muon_tiny.yaml")
+
+    assert config.name == "smoke_muon_tiny"
+    assert config.tags.stage == "smoke"
+    assert config.tags.optimizer == "muon"
+    assert config.tags.model == "tiny_qwen_2_5"
+
+
+# /**
+#  * Проверяет текущий контракт конфигурации Muon optimizer.
+#  *
+#  * @return None.
+#  */
+def test_muon_optimizer_config_contains_parameters() -> None:
+    root = Path(__file__).resolve().parents[1]
+    config = OmegaConf.load(root / "configs" / "optimizer" / "muon.yaml")
+
+    assert config.name == "muon"
+    assert config.implementation == "custom"
+    assert config.lr == 1e-4
+    assert config.weight_decay == 0.01
+    assert config.muon_layer_count == 24
+    assert list(config.muon_param_patterns) == [
+        "model.layers.{layer}.self_attn.q_proj.weight",
+        "model.layers.{layer}.self_attn.k_proj.weight",
+        "model.layers.{layer}.self_attn.v_proj.weight",
+        "model.layers.{layer}.self_attn.o_proj.weight",
+        "model.layers.{layer}.mlp.gate_proj.weight",
+        "model.layers.{layer}.mlp.up_proj.weight",
+        "model.layers.{layer}.mlp.down_proj.weight",
+    ]
+    assert config.momentum == 0.95
+    assert config.nesterov is True
+    assert config.ns_steps == 5
+    assert list(config.adamw_betas) == [0.9, 0.95]
+    assert config.adamw_eps == 1e-8
+
+
+# /**
 #  * Проверяет базовый контракт lm-evaluation-harness конфига.
 #  *
 #  * @return None.

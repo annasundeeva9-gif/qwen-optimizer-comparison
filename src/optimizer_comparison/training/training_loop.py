@@ -20,6 +20,7 @@ from optimizer_comparison.data.dataset_loader import (
 from optimizer_comparison.data.prepare_data import run_data_pipeline
 from optimizer_comparison.models.build_model import build_model
 from optimizer_comparison.models.tokenization import build_tokenizer
+from optimizer_comparison.training.muon_trainer import MuonTrainer
 from optimizer_comparison.training.result_contract import TrainingResult, build_training_result
 from optimizer_comparison.training.seed import set_seed
 
@@ -134,9 +135,18 @@ def get_final_training_dataset(config: DictConfig) -> DatasetDict:
 def build_training_arguments(config: DictConfig, run_dir: str | Path) -> TrainingArguments:
     training_config = config.training
     optimizer_config = config.optimizer
-    adam_betas = list(optimizer_config.betas)
+    adam_betas = list(
+        optimizer_config.adamw_betas
+        if "adamw_betas" in optimizer_config
+        else optimizer_config.betas
+    )
     if len(adam_betas) != 2:
-        raise ValueError("AdamW optimizer config must define exactly two beta values.")
+        raise ValueError("Optimizer config must define exactly two Adam beta values.")
+    adam_eps = (
+        optimizer_config.adamw_eps
+        if "adamw_eps" in optimizer_config
+        else optimizer_config.eps
+    )
     output_dir = Path(run_dir) / "trainer_output"
 
     return TrainingArguments(
@@ -146,7 +156,7 @@ def build_training_arguments(config: DictConfig, run_dir: str | Path) -> Trainin
         weight_decay=float(optimizer_config.weight_decay),
         adam_beta1=float(adam_betas[0]),
         adam_beta2=float(adam_betas[1]),
-        adam_epsilon=float(optimizer_config.eps),
+        adam_epsilon=float(adam_eps),
         lr_scheduler_type=str(training_config.lr_scheduler_type),
         warmup_ratio=float(training_config.warmup_ratio),
         max_grad_norm=float(training_config.max_grad_norm),
@@ -222,7 +232,18 @@ def build_muon_trainer(
     dataset: DatasetDict,
     run_dir: str | Path,
 ) -> Trainer:
-    raise NotImplementedError("Muon trainer is pending manual integration.")
+    training_args = build_training_arguments(config=config, run_dir=run_dir)
+    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+
+    return MuonTrainer(
+        optimizer_config=config.optimizer,
+        model=model,
+        args=training_args,
+        train_dataset=dataset["train"],
+        eval_dataset=dataset["validation"],
+        data_collator=data_collator,
+        processing_class=tokenizer,
+    )
 
 
 # /**
