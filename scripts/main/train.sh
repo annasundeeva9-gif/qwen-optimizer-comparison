@@ -12,6 +12,7 @@ MODEL="qwen_0_5b"
 TRAINING=""
 OPTIMIZER="adamw"
 EXPERIMENT=""
+EXPERIMENT_CONFIG=""
 HF_REPO_ID=""
 EXTRA_OVERRIDES=()
 
@@ -79,8 +80,17 @@ fi
 if [[ "${TRAINING}" == "mock" ]]; then
   TRAINING="smoke"
 fi
+
+if [[ "${MODE}" == "mock" ]]; then
+  EXPERIMENT_CONFIG="mock_adamw"
+elif [[ "${MODE}" == "smoke" ]]; then
+  EXPERIMENT_CONFIG="smoke_adamw_tiny"
+else
+  EXPERIMENT_CONFIG="${OPTIMIZER}_baseline"
+fi
+
 if [[ -z "${EXPERIMENT}" ]]; then
-  EXPERIMENT="${OPTIMIZER}_baseline"
+  EXPERIMENT="${EXPERIMENT_CONFIG}"
 fi
 
 HF_OVERRIDES=()
@@ -97,6 +107,7 @@ python -m optimizer_comparison.train \
   "model=${MODEL}" \
   "training=${TRAINING}" \
   "optimizer=${OPTIMIZER}" \
-  "experiment=${EXPERIMENT}" \
+  "experiment=${EXPERIMENT_CONFIG}" \
+  "experiment.name=${EXPERIMENT}" \
   "${HF_OVERRIDES[@]}" \
   "${EXTRA_OVERRIDES[@]}"

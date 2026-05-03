@@ -35,6 +35,9 @@ def build_empty_artifacts() -> dict[str, object]:
             "cleanup_error": None,
             "removed_paths": [],
         },
+        "plots": {
+            "training_curves_path": None,
+        },
         "hf_hub": {
             "repo_id": None,
             "artifact_path": None,

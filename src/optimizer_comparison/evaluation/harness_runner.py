@@ -162,6 +162,7 @@ def run_process_with_live_log(
 
     with path.open("w", encoding="utf-8") as log_file:
         log_file.write("===== OUTPUT =====\n")
+        log_file.flush()
         process = subprocess.Popen(
             command,
             stdout=subprocess.PIPE,
@@ -184,7 +185,8 @@ def run_process_with_live_log(
                 continue
 
             # Preserve tqdm carriage returns while still keeping a raw log copy.
-            print(chunk, end="", flush=True)
+            sys.stdout.write(chunk)
+            sys.stdout.flush()
             log_file.write(chunk)
             log_file.flush()
 
@@ -238,6 +240,8 @@ def run_lm_eval_harness(
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTHONUTF8"] = "1"
+    env["PYTHONUNBUFFERED"] = "1"
+    env["TQDM_DISABLE"] = "0"
     print("Running lm-evaluation-harness...", file=sys.stderr)
     returncode = run_process_with_live_log(
         command=command,

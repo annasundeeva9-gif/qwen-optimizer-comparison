@@ -5,7 +5,11 @@ import pytest
 from omegaconf import OmegaConf
 
 from optimizer_comparison.evaluation import model_source as model_source_module
-from optimizer_comparison.evaluation.model_source import resolve_evaluation_model_source
+from optimizer_comparison.evaluation.model_source import (
+    BASE_QWEN_MODEL_ID,
+    BASE_QWEN_RUN_DIR,
+    resolve_evaluation_model_source,
+)
 
 
 # /**
@@ -51,6 +55,24 @@ def make_hf_hub_config(download_dir: Path) -> Any:
                     "revision": "abc123",
                     "token_env_var": "HF_TOKEN",
                     "download_dir": str(download_dir),
+                }
+            }
+        }
+    )
+
+
+# /**
+#  * Создает evaluation config для фиксированной базовой модели проекта.
+#  *
+#  * @return Hydra-like config.
+#  */
+def make_base_model_config() -> Any:
+    return OmegaConf.create(
+        {
+            "evaluation": {
+                "source": {
+                    "use_base_model": True,
+                    "use_hf_hub": False,
                 }
             }
         }
@@ -117,6 +139,33 @@ def test_resolve_evaluation_model_source_uses_run_dir(tmp_path: Path) -> None:
     assert source.run_dir == run_dir
     assert source.model_path == run_dir / "model"
     assert source.tokenizer_path == run_dir / "tokenizer"
+
+
+# /**
+#  * Проверяет специальный source для baseline evaluation базовой Qwen2.5-0.5B.
+#  *
+#  * @return None.
+#  */
+def test_resolve_evaluation_model_source_uses_base_qwen_model() -> None:
+    source = resolve_evaluation_model_source(make_base_model_config())
+
+    assert source.source_type == "base_model"
+    assert source.run_dir == model_source_module.resolve_project_path(BASE_QWEN_RUN_DIR)
+    assert source.model_path == BASE_QWEN_MODEL_ID
+    assert source.tokenizer_path == BASE_QWEN_MODEL_ID
+
+
+# /**
+#  * Проверяет понятную ошибку для несовместимых source-флагов.
+#  *
+#  * @return None.
+#  */
+def test_resolve_evaluation_model_source_rejects_base_model_with_hf_hub() -> None:
+    config = make_base_model_config()
+    config.evaluation.source.use_hf_hub = True
+
+    with pytest.raises(ValueError, match="use_base_model"):
+        resolve_evaluation_model_source(config)
 
 
 # /**

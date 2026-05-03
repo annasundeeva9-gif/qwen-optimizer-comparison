@@ -93,6 +93,12 @@ Smoke train+eval:
 bash scripts/workflows/smoke.sh
 ```
 
+Smoke train+eval with Hugging Face Hub upload:
+
+```bash
+bash scripts/workflows/smoke.sh --hf-repo-id <hf_user_or_org>/<repo>
+```
+
 Remote train with Hugging Face Hub upload:
 
 ```bash
@@ -109,4 +115,10 @@ Manual evaluation grid:
 
 ```bash
 bash scripts/workflows/eval_grid.sh
+```
+
+Download a remote run, merge MLflow snapshot, and run local evaluation:
+
+```bash
+bash scripts/workflows/load_eval.sh --hf-repo-id <hf_user_or_org>/<repo> --run-id <run_id>
 ```

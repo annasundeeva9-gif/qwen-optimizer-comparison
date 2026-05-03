@@ -3,12 +3,14 @@ from pathlib import Path
 
 from omegaconf import OmegaConf
 
+from optimizer_comparison.evaluation.model_source import BASE_QWEN_MODEL_ID, BASE_QWEN_RUN_NAME
 from optimizer_comparison.tracking.mlflow_logger import (
     collect_training_params,
     is_tracking_enabled,
     log_custom_artifacts,
     log_evaluation_run,
     log_hf_hub_tags,
+    log_training_artifacts,
     log_training_history,
 )
 
@@ -179,6 +181,37 @@ def test_log_custom_artifacts_logs_explicit_files(monkeypatch, tmp_path: Path) -
 
 
 # /**
+#  * Проверяет логирование training plot artifacts в MLflow.
+#  *
+#  * @param monkeypatch Инструмент pytest для подмены mlflow.log_artifact.
+#  * @param tmp_path Временная директория pytest.
+#  * @return None.
+#  */
+def test_log_training_artifacts_logs_training_curves(monkeypatch, tmp_path: Path) -> None:
+    plot_path = tmp_path / "training_curves.png"
+    plot_path.write_bytes(b"png")
+    logged_artifacts: list[str] = []
+
+    monkeypatch.setattr(
+        "optimizer_comparison.tracking.mlflow_logger.mlflow.log_artifact",
+        lambda path: logged_artifacts.append(path),
+    )
+
+    log_training_artifacts(
+        config=OmegaConf.create({"tracking": {"log_artifacts": True}}),
+        training_result={
+            "artifacts": {
+                "plots": {
+                    "training_curves_path": str(plot_path),
+                }
+            }
+        },
+    )
+
+    assert logged_artifacts == [str(plot_path)]
+
+
+# /**
 #  * Проверяет логирование evaluation metrics в существующий MLflow run.
 #  *
 #  * @param monkeypatch Инструмент pytest для подмены MLflow API.
@@ -187,6 +220,7 @@ def test_log_custom_artifacts_logs_explicit_files(monkeypatch, tmp_path: Path) -
 #  */
 def test_log_evaluation_run_logs_metrics_to_existing_run(monkeypatch, tmp_path: Path) -> None:
     lm_eval_result_path = tmp_path / "lm_eval_results.json"
+    summary_path = tmp_path / "evaluation_summary.csv"
     lm_eval_result_path.write_text(
         json.dumps(
             {
@@ -201,9 +235,11 @@ def test_log_evaluation_run_logs_metrics_to_existing_run(monkeypatch, tmp_path: 
         ),
         encoding="utf-8",
     )
+    summary_path.write_text("task,metric,value\npiqa,acc,0.75\n", encoding="utf-8")
     started_runs: list[str] = []
     logged_metrics: list[tuple[str, float]] = []
     logged_tags: list[dict[str, str]] = []
+    logged_artifacts: list[str] = []
 
     class FakeRun:
         def __enter__(self):
@@ -236,6 +272,10 @@ def test_log_evaluation_run_logs_metrics_to_existing_run(monkeypatch, tmp_path: 
         "optimizer_comparison.tracking.mlflow_logger.mlflow.set_tags",
         lambda tags: logged_tags.append(tags),
     )
+    monkeypatch.setattr(
+        "optimizer_comparison.tracking.mlflow_logger.mlflow.log_artifact",
+        lambda path: logged_artifacts.append(path),
+    )
 
     log_evaluation_run(
         config=OmegaConf.create(
@@ -252,18 +292,106 @@ def test_log_evaluation_run_logs_metrics_to_existing_run(monkeypatch, tmp_path: 
             "mlflow_run_id": "mlflow-run-id",
             "lm_eval_result_path": str(lm_eval_result_path),
             "raw_log_path": str(tmp_path / "stdout.txt"),
+            "summary_path": str(summary_path),
         },
     )
 
     assert started_runs == ["mlflow-run-id"]
     assert logged_metrics == [
         ("eval_harness/piqa/acc/none", 0.75),
-        ("eval_harness/piqa/acc_stderr/none", 0.01),
     ]
+    assert logged_artifacts == [str(summary_path)]
     assert logged_tags == [
         {
             "evaluation.status": "completed",
             "evaluation.result_path": str(lm_eval_result_path),
+            "evaluation.raw_log_path": str(tmp_path / "stdout.txt"),
+        }
+    ]
+
+
+# /**
+#  * Проверяет создание отдельного MLflow run для baseline evaluation без training run id.
+#  *
+#  * @param monkeypatch Инструмент pytest для подмены MLflow API.
+#  * @param tmp_path Временная директория pytest.
+#  * @return None.
+#  */
+def test_log_evaluation_run_creates_run_for_base_model(monkeypatch, tmp_path: Path) -> None:
+    lm_eval_result_path = tmp_path / "lm_eval_results.json"
+    lm_eval_result_path.write_text(
+        json.dumps({"results": {"piqa": {"acc,none": 0.75}}}),
+        encoding="utf-8",
+    )
+    started_run_names: list[str] = []
+    logged_tags: list[dict[str, str]] = []
+
+    class FakeRun:
+        def __init__(self) -> None:
+            self.info = type("Info", (), {"run_id": "new-base-run-id"})()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+    def fake_start_run(run_name: str):
+        started_run_names.append(run_name)
+        return FakeRun()
+
+    monkeypatch.setattr(
+        "optimizer_comparison.tracking.mlflow_logger.mlflow.set_tracking_uri",
+        lambda uri: None,
+    )
+    monkeypatch.setattr(
+        "optimizer_comparison.tracking.mlflow_logger.mlflow.set_experiment",
+        lambda name: None,
+    )
+    monkeypatch.setattr(
+        "optimizer_comparison.tracking.mlflow_logger.mlflow.start_run",
+        fake_start_run,
+    )
+    monkeypatch.setattr(
+        "optimizer_comparison.tracking.mlflow_logger.mlflow.log_metric",
+        lambda name, value: None,
+    )
+    monkeypatch.setattr(
+        "optimizer_comparison.tracking.mlflow_logger.mlflow.set_tags",
+        lambda tags: logged_tags.append(tags),
+    )
+
+    mlflow_run_id = log_evaluation_run(
+        config=OmegaConf.create(
+            {
+                "tracking": {
+                    "enabled": True,
+                    "tracking_uri": str(tmp_path / "mlruns"),
+                    "experiment_name": "optimizer-comparison",
+                }
+            }
+        ),
+        evaluation_result={
+            "status": "completed",
+            "run_name": BASE_QWEN_RUN_NAME,
+            "mlflow_run_id": None,
+            "lm_eval_result_path": str(lm_eval_result_path),
+            "raw_log_path": str(tmp_path / "stdout.txt"),
+            "model_source": {
+                "type": "base_model",
+                "base_model_id": BASE_QWEN_MODEL_ID,
+            },
+        },
+    )
+
+    assert mlflow_run_id == "new-base-run-id"
+    assert started_run_names == [BASE_QWEN_RUN_NAME]
+    assert logged_tags == [
+        {
+            "evaluation.status": "completed",
+            "evaluation.result_path": str(lm_eval_result_path),
+            "evaluation.source_type": "base_model",
+            "evaluation.base_model_id": BASE_QWEN_MODEL_ID,
             "evaluation.raw_log_path": str(tmp_path / "stdout.txt"),
         }
     ]

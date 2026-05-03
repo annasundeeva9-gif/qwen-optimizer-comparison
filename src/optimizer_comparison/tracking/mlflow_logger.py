@@ -170,6 +170,30 @@ def log_custom_artifacts(config: DictConfig, artifact_paths: list[str]) -> None:
 
 
 # /**
+#  * Логирует компактные training plot artifacts в MLflow.
+#  *
+#  * @param config Полная конфигурация запуска.
+#  * @param training_result Training-result с artifacts.plots.
+#  * @return None.
+#  */
+def log_training_artifacts(config: DictConfig, training_result: TrainingResult) -> None:
+    artifacts = training_result.get("artifacts", {})
+    if not isinstance(artifacts, dict):
+        raise TypeError("Training result artifacts must be a dictionary.")
+
+    plots = artifacts.get("plots", {})
+    if not isinstance(plots, dict):
+        return
+
+    plot_paths = [
+        str(path)
+        for path in [plots.get("training_curves_path", None)]
+        if path is not None
+    ]
+    log_custom_artifacts(config=config, artifact_paths=plot_paths)
+
+
+# /**
 #  * Логирует полный training run в MLflow, если tracking включен.
 #  *
 #  * @param config Полная конфигурация запуска.
@@ -195,6 +219,7 @@ def log_training_run(config: DictConfig, training_result: TrainingResult) -> str
         log_training_metrics(training_result)
         log_training_history(training_result)
         log_hf_hub_tags(training_result)
+        log_training_artifacts(config=config, training_result=training_result)
 
         return str(active_run.info.run_id)
 
@@ -247,6 +272,15 @@ def log_evaluation_tags(evaluation_result: dict[str, Any]) -> None:
         "evaluation.result_path": str(evaluation_result.get("lm_eval_result_path", "")),
     }
 
+    model_source = evaluation_result.get("model_source", None)
+    if isinstance(model_source, dict):
+        source_type = model_source.get("type", None)
+        base_model_id = model_source.get("base_model_id", None)
+        if source_type is not None:
+            tags["evaluation.source_type"] = str(source_type)
+        if base_model_id is not None:
+            tags["evaluation.base_model_id"] = str(base_model_id)
+
     raw_log_path = evaluation_result.get("raw_log_path", None)
     if raw_log_path is not None:
         tags["evaluation.raw_log_path"] = str(raw_log_path)
@@ -255,19 +289,31 @@ def log_evaluation_tags(evaluation_result: dict[str, Any]) -> None:
 
 
 # /**
+#  * Логирует CSV summary evaluation run-а как MLflow artifact.
+#  *
+#  * @param evaluation_result Evaluation-result с путем summary_path.
+#  * @return None.
+#  */
+def log_evaluation_artifacts(evaluation_result: dict[str, Any]) -> None:
+    summary_path = evaluation_result.get("summary_path", None)
+    if summary_path is None:
+        return
+
+    path = resolve_project_path(str(summary_path))
+    if path.is_file():
+        mlflow.log_artifact(str(path))
+
+
+# /**
 #  * Логирует полный evaluation run в MLflow.
 #  *
 #  * @param config Полная конфигурация запуска.
 #  * @param evaluation_result Evaluation-result будущего evaluation-пайплайна.
-#  * @return None.
+#  * @return MLflow run id или None, если tracking выключен.
 #  */
-def log_evaluation_run(config: DictConfig, evaluation_result: dict[str, Any]) -> None:
+def log_evaluation_run(config: DictConfig, evaluation_result: dict[str, Any]) -> str | None:
     if not is_tracking_enabled(config):
-        return
-
-    mlflow_run_id = evaluation_result.get("mlflow_run_id", None)
-    if mlflow_run_id is None:
-        raise ValueError("evaluation_result.mlflow_run_id is required for MLflow logging.")
+        return None
 
     lm_eval_result_path = evaluation_result.get("lm_eval_result_path", None)
     if lm_eval_result_path is None:
@@ -275,6 +321,18 @@ def log_evaluation_run(config: DictConfig, evaluation_result: dict[str, Any]) ->
 
     setup_mlflow(config)
     parsed_lm_eval_result = parse_lm_eval_results(str(lm_eval_result_path))
+    mlflow_run_id = evaluation_result.get("mlflow_run_id", None)
+
+    if mlflow_run_id is None:
+        run_name = str(evaluation_result.get("run_name", "evaluation"))
+        with mlflow.start_run(run_name=run_name) as active_run:
+            log_evaluation_metrics(parsed_lm_eval_result)
+            log_evaluation_tags(evaluation_result)
+            log_evaluation_artifacts(evaluation_result)
+            return str(active_run.info.run_id)
+
     with mlflow.start_run(run_id=str(mlflow_run_id)):
         log_evaluation_metrics(parsed_lm_eval_result)
         log_evaluation_tags(evaluation_result)
+        log_evaluation_artifacts(evaluation_result)
+        return str(mlflow_run_id)

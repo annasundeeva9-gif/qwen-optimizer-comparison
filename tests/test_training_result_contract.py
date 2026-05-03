@@ -73,6 +73,7 @@ def test_training_result_has_required_artifacts() -> None:
     assert "model" in artifacts
     assert "tokenizer" in artifacts
     assert "checkpoints" in artifacts
+    assert "plots" in artifacts
     assert "hf_hub" in artifacts
 
     model_artifacts = artifacts["model"]
@@ -93,6 +94,11 @@ def test_training_result_has_required_artifacts() -> None:
     assert "cleanup_status" in checkpoint_artifacts
     assert "cleanup_error" in checkpoint_artifacts
     assert "removed_paths" in checkpoint_artifacts
+
+    plot_artifacts = artifacts["plots"]
+
+    assert isinstance(plot_artifacts, dict)
+    assert "training_curves_path" in plot_artifacts
 
     hf_hub_artifacts = artifacts["hf_hub"]
 

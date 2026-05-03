@@ -11,14 +11,19 @@ from omegaconf import DictConfig
 from optimizer_comparison.artifacts.hf_hub import download_artifacts_from_hf
 from optimizer_comparison.artifacts.local_store import resolve_project_path
 
+BASE_QWEN_MODEL_ID = "Qwen/Qwen2.5-0.5B"
+BASE_QWEN_RUN_ID = "__base_qwen_2_5_0_5b__"
+BASE_QWEN_RUN_NAME = "base_qwen_2_5_0_5b"
+BASE_QWEN_RUN_DIR = "outputs/runs/__base_qwen_2_5_0_5b__"
+
 
 # /**
 #  * Описывает локально доступные model/tokenizer artifacts для evaluation.
 #  *
-#  * @param source_type Тип источника: local или hf_hub.
+#  * @param source_type Тип источника: local, hf_hub или base_model.
 #  * @param run_dir Локальная директория training run-а, если она известна.
-#  * @param model_path Локальный путь к директории модели.
-#  * @param tokenizer_path Локальный путь к директории токенизатора.
+#  * @param model_path Локальный путь к модели или фиксированный HF id для base model.
+#  * @param tokenizer_path Локальный путь к токенизатору или фиксированный HF id для base model.
 #  * @param hf_repo_id HF repo id, если artifacts восстановлены из Hub.
 #  * @param hf_artifact_path Путь artifacts внутри HF repo, если использовался Hub.
 #  * @param hf_revision Revision HF repo, если он задан.
@@ -27,8 +32,8 @@ from optimizer_comparison.artifacts.local_store import resolve_project_path
 class EvaluationModelSource:
     source_type: str
     run_dir: Path | None
-    model_path: Path
-    tokenizer_path: Path
+    model_path: Path | str
+    tokenizer_path: Path | str
     hf_repo_id: str | None = None
     hf_artifact_path: str | None = None
     hf_revision: str | None = None
@@ -156,6 +161,22 @@ def resolve_hf_hub_model_source(source_config: DictConfig) -> EvaluationModelSou
 
 
 # /**
+#  * Возвращает фиксированный источник для evaluation базовой Qwen2.5-0.5B.
+#  *
+#  * Это специальный baseline-случай проекта, а не общий механизм выбора HF-моделей.
+#  *
+#  * @return Описание source с HF id модели и заметной run directory для результатов.
+#  */
+def resolve_base_qwen_model_source() -> EvaluationModelSource:
+    return EvaluationModelSource(
+        source_type="base_model",
+        run_dir=resolve_project_path(BASE_QWEN_RUN_DIR),
+        model_path=BASE_QWEN_MODEL_ID,
+        tokenizer_path=BASE_QWEN_MODEL_ID,
+    )
+
+
+# /**
 #  * Выбирает local или HF Hub источник model/tokenizer artifacts для evaluation.
 #  *
 #  * @param config Полный Hydra-конфиг или только evaluation-секция.
@@ -163,6 +184,11 @@ def resolve_hf_hub_model_source(source_config: DictConfig) -> EvaluationModelSou
 #  */
 def resolve_evaluation_model_source(config: DictConfig) -> EvaluationModelSource:
     source_config = get_evaluation_source_config(config)
+    if bool(source_config.get("use_base_model", False)):
+        if bool(source_config.get("use_hf_hub", False)):
+            raise ValueError("evaluation.source.use_base_model cannot be combined with use_hf_hub.")
+        return resolve_base_qwen_model_source()
+
     if bool(source_config.get("use_hf_hub", False)):
         return resolve_hf_hub_model_source(source_config)
     return resolve_local_model_source(source_config)

@@ -22,6 +22,7 @@ from optimizer_comparison.tracking.mlflow_logger import (
     update_training_run_hf_tags,
 )
 from optimizer_comparison.training.mock_trainer import run_mock_training
+from optimizer_comparison.training.plots import add_training_curves_artifact
 from optimizer_comparison.training.result_contract import set_local_artifact_paths
 from optimizer_comparison.training.training_loop import run_training
 
@@ -86,6 +87,7 @@ def main(config: DictConfig) -> None:
         config_path=config_path,
         result_path=result_path,
     )
+    result = add_training_curves_artifact(result=result, run_dir=run_dir)
     save_json(data=result, output_path=result_path)
     result["mlflow_run_id"] = log_training_run(config=config, training_result=result)
     save_json(data=result, output_path=result_path)

@@ -90,12 +90,14 @@ def test_evaluation_config_contains_lm_eval_contract() -> None:
         "winogrande",
         "hellaswag",
     ]
-    assert config.harness.batch_size == "auto"
+    assert isinstance(config.harness.batch_size, int)
+    assert config.harness.batch_size > 0
     assert "device" not in config.harness
     assert config.harness.output_path == "outputs/eval/lm_eval_results.json"
     assert config.harness.raw_log_path == "outputs/eval/lm_eval_stdout.txt"
     assert config.harness.result_filename == "evaluation_result.json"
 
+    assert config.source.use_base_model is False
     assert config.source.use_hf_hub is False
     assert config.source.run_dir is None
     assert config.source.model_path is None

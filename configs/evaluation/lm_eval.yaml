@@ -5,12 +5,13 @@ harness:
     - arc_challenge
     - winogrande
     - hellaswag
-  batch_size: auto
+  batch_size: 8
   output_path: outputs/eval/lm_eval_results.json
   raw_log_path: outputs/eval/lm_eval_stdout.txt
   result_filename: evaluation_result.json
 
 source:
+  use_base_model: false
   use_hf_hub: false
   run_dir: null
   model_path: null

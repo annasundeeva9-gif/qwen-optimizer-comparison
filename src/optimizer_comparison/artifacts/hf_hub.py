@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 import warnings
+import zipfile
 from pathlib import Path
 
 from huggingface_hub import HfApi, snapshot_download
@@ -131,6 +132,97 @@ def download_artifacts_from_hf(
         allow_patterns=allow_patterns,
     )
     return target_path / repo_path if repo_path else target_path
+
+
+# /**
+#  * Загружает один файл из Hugging Face Hub в локальную директорию.
+#  *
+#  * @param repo_id Идентификатор HF repo.
+#  * @param target_dir Локальная директория для скачивания.
+#  * @param repo_path Путь файла внутри repo.
+#  * @param token HF token или None для публичного repo.
+#  * @param revision Revision или commit sha.
+#  * @return Путь к скачанному файлу.
+#  */
+def download_file_from_hf(
+    repo_id: str,
+    target_dir: str | Path,
+    repo_path: str,
+    token: str | None = None,
+    revision: str | None = None,
+) -> Path:
+    target_path = Path(target_dir)
+    snapshot_download(
+        repo_id=repo_id,
+        revision=revision,
+        token=token,
+        local_dir=str(target_path),
+        allow_patterns=[repo_path],
+    )
+    downloaded_path = target_path / repo_path
+    if not downloaded_path.is_file():
+        raise FileNotFoundError(
+            "HF file artifact was not downloaded. "
+            f"Expected local file: {downloaded_path}. "
+            f"Check that repo_path exists in the HF repo: {repo_path}"
+        )
+    return downloaded_path
+
+
+# /**
+#  * Сливает содержимое одной директории в другую без удаления уже существующих подпапок.
+#  *
+#  * @param source_dir Директория-источник.
+#  * @param target_dir Целевая директория.
+#  * @return None.
+#  */
+def merge_directory_contents(source_dir: str | Path, target_dir: str | Path) -> None:
+    source_path = Path(source_dir)
+    target_path = Path(target_dir)
+    if not source_path.is_dir():
+        raise FileNotFoundError(f"Source directory for merge does not exist: {source_dir}")
+
+    target_path.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(source_path, target_path, dirs_exist_ok=True)
+
+
+# /**
+#  * Распаковывает zip snapshot MLflow и сливает его с локальным file store.
+#  *
+#  * Snapshot должен содержать верхнеуровневую директорию mlruns, как архивы,
+#  * созданные create_mlflow_snapshot_archive().
+#  *
+#  * @param archive_path Путь к zip snapshot-у.
+#  * @param target_mlruns_dir Локальная директория outputs/mlruns.
+#  * @param extract_dir Временная директория для распаковки.
+#  * @return Путь к локальной директории MLflow после merge.
+#  */
+def merge_mlflow_snapshot_archive(
+    archive_path: str | Path,
+    target_mlruns_dir: str | Path,
+    extract_dir: str | Path,
+) -> Path:
+    archive = Path(archive_path)
+    if not archive.is_file():
+        raise FileNotFoundError(f"MLflow snapshot archive does not exist: {archive_path}")
+
+    extract_path = Path(extract_dir)
+    if extract_path.exists():
+        shutil.rmtree(extract_path)
+    extract_path.mkdir(parents=True, exist_ok=True)
+
+    with zipfile.ZipFile(archive) as zip_file:
+        zip_file.extractall(extract_path)
+
+    extracted_mlruns = extract_path / "mlruns"
+    if not extracted_mlruns.is_dir():
+        raise FileNotFoundError(
+            f"MLflow snapshot must contain top-level mlruns directory: {archive_path}"
+        )
+
+    target_path = Path(target_mlruns_dir)
+    merge_directory_contents(source_dir=extracted_mlruns, target_dir=target_path)
+    return target_path
 
 
 # /**

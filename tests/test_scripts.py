@@ -24,7 +24,9 @@ def test_main_train_script_accepts_optimizer_argument() -> None:
     assert '"training=${TRAINING}"' in script
     assert 'OPTIMIZER="$(echo "${OPTIMIZER}" | tr' in script
     assert '"optimizer=${OPTIMIZER}"' in script
-    assert 'EXPERIMENT="${OPTIMIZER}_baseline"' in script
+    assert 'EXPERIMENT_CONFIG="${OPTIMIZER}_baseline"' in script
+    assert '"experiment=${EXPERIMENT_CONFIG}"' in script
+    assert '"experiment.name=${EXPERIMENT}"' in script
 
 
 # /**
@@ -62,10 +64,16 @@ def test_main_train_eval_script_runs_train_then_eval() -> None:
     script = (project_root() / "scripts" / "main" / "train_eval.sh").read_text(encoding="utf-8")
 
     assert "python -m optimizer_comparison.train" in script
+    assert "--hf-repo-id" in script
+    assert "artifacts.hf_hub.use=true" in script
     assert '"training=${TRAINING}"' in script
+    assert '"experiment=${EXPERIMENT_CONFIG}"' in script
+    assert '"experiment.name=${EXPERIMENT}"' in script
     assert "RUN_DIR=\"$(ls -td " in script
     assert "python -m optimizer_comparison.evaluate" in script
     assert '"evaluation.source.run_dir=${RUN_DIR}"' in script
+    assert "python scripts/workflows/upload_hf_artifact.py" in script
+    assert "python scripts/workflows/upload_mlflow_snapshot.py" in script
 
 
 # /**
@@ -79,6 +87,8 @@ def test_workflow_smoke_script_uses_tiny_qwen_model() -> None:
     )
 
     assert "bash scripts/main/train_eval.sh" in script
+    assert "HF_REPO_ID" in script
+    assert "--hf-repo-id" in script
     assert "--mode smoke" in script
     assert "--model tiny_qwen_2_5" in script
     assert "--optimizer adamw" in script
@@ -149,3 +159,23 @@ def test_workflow_eval_grid_script_uses_manual_run_dirs() -> None:
     assert "RUN_DIRS=(" in script
     assert "REPLACE_ME" in script
     assert "bash scripts/main/eval.sh" in script
+
+
+# /**
+#  * Проверяет workflow загрузки remote run-а, merge MLflow snapshot-а и запуска eval.
+#  *
+#  * @return None.
+#  */
+def test_workflow_load_eval_downloads_run_and_mlruns() -> None:
+    script = (project_root() / "scripts" / "workflows" / "load_eval.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert "--run-id" in script
+    assert "python scripts/workflows/download_mlflow_snapshot.py" in script
+    assert "--skip-mlflow" in script
+    assert "tracking.enabled=false" in script
+    assert "python -m optimizer_comparison.evaluate" in script
+    assert "evaluation.source.use_hf_hub=true" in script
+    assert "evaluation.source.repo_path=runs/${RUN_ID}" in script
+    assert "evaluation.source.download_dir=outputs" in script

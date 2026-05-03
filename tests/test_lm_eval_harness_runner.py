@@ -28,7 +28,7 @@ def make_config(tmp_path: Path, limit: int | None) -> Any:
             "evaluation": {
                 "harness": {
                     "tasks": ["piqa", "arc_easy"],
-                    "batch_size": "auto",
+                    "batch_size": 1,
                     "output_path": str(tmp_path / "lm_eval_results.json"),
                     "raw_log_path": str(tmp_path / "lm_eval_stdout.txt"),
                 }
@@ -71,7 +71,7 @@ def test_build_lm_eval_command_uses_hf_model_and_cuda(tmp_path: Path) -> None:
     assert "piqa" in command
     assert "arc_easy" in command
     assert command[command.index("--device") + 1] == "cuda"
-    assert command[command.index("--batch_size") + 1] == "auto"
+    assert command[command.index("--batch_size") + 1] == "1"
     assert command[command.index("--output_path") + 1] == str(
         tmp_path / "evaluation" / "lm_eval_results.json"
     )
@@ -191,6 +191,8 @@ def test_run_lm_eval_harness_returns_output_paths(
         Path(raw_log_path).write_text("===== OUTPUT =====\nok", encoding="utf-8")
         assert env["PYTHONIOENCODING"] == "utf-8"
         assert env["PYTHONUTF8"] == "1"
+        assert env["PYTHONUNBUFFERED"] == "1"
+        assert env["TQDM_DISABLE"] == "0"
         return 0
 
     monkeypatch.setattr(harness_runner.torch.cuda, "is_available", lambda: True)

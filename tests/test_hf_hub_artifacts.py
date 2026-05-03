@@ -10,6 +10,8 @@ from optimizer_comparison.artifacts.hf_hub import (
     cleanup_local_checkpoint_artifacts,
     create_mlflow_snapshot_archive,
     download_artifacts_from_hf,
+    download_file_from_hf,
+    merge_mlflow_snapshot_archive,
     persist_training_artifacts_to_hf,
     upload_mlflow_snapshot_to_hf,
     upload_path_to_hf,
@@ -377,6 +379,39 @@ def test_download_artifacts_from_hf_uses_repo_path(
 
 
 # /**
+#  * Проверяет download helper для одного файла из HF Hub.
+#  *
+#  * @param monkeypatch Инструмент pytest для подмены snapshot_download.
+#  * @param tmp_path Временная директория pytest.
+#  * @return None.
+#  */
+def test_download_file_from_hf_requires_downloaded_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    expected_file = tmp_path / "mlflow" / "mlruns.zip"
+    calls: list[dict[str, Any]] = []
+
+    def fake_snapshot_download(**kwargs: Any) -> str:
+        calls.append(kwargs)
+        expected_file.parent.mkdir(parents=True)
+        expected_file.write_text("zip", encoding="utf-8")
+        return str(tmp_path)
+
+    monkeypatch.setattr(hf_hub, "snapshot_download", fake_snapshot_download)
+
+    downloaded_file = download_file_from_hf(
+        repo_id="user/repo",
+        target_dir=tmp_path,
+        repo_path="mlflow/mlruns.zip",
+        token="token",
+    )
+
+    assert downloaded_file == expected_file
+    assert calls[0]["allow_patterns"] == ["mlflow/mlruns.zip"]
+
+
+# /**
 #  * Проверяет создание zip snapshot-а MLflow file store.
 #  *
 #  * @param tmp_path Временная директория pytest.
@@ -395,6 +430,39 @@ def test_create_mlflow_snapshot_archive_creates_zip(tmp_path: Path) -> None:
 
     assert archive_path == tmp_path / "snapshots" / "mlruns_snapshot.zip"
     assert archive_path.is_file()
+
+
+# /**
+#  * Проверяет, что MLflow snapshot сливается с локальным хранилищем без удаления старых run-ов.
+#  *
+#  * @param tmp_path Временная директория pytest.
+#  * @return None.
+#  */
+def test_merge_mlflow_snapshot_archive_preserves_local_runs(tmp_path: Path) -> None:
+    local_metric = tmp_path / "outputs" / "mlruns" / "1" / "local_run" / "metrics" / "loss"
+    local_metric.parent.mkdir(parents=True)
+    local_metric.write_text("1 0.5 1\n", encoding="utf-8")
+
+    remote_mlruns = tmp_path / "remote" / "mlruns"
+    remote_metric = remote_mlruns / "1" / "remote_run" / "metrics" / "loss"
+    remote_metric.parent.mkdir(parents=True)
+    remote_metric.write_text("1 0.4 1\n", encoding="utf-8")
+    archive_path = create_mlflow_snapshot_archive(
+        mlruns_dir=remote_mlruns,
+        output_dir=tmp_path / "snapshots",
+    )
+
+    merged_path = merge_mlflow_snapshot_archive(
+        archive_path=archive_path,
+        target_mlruns_dir=tmp_path / "outputs" / "mlruns",
+        extract_dir=tmp_path / "extract",
+    )
+
+    assert merged_path == tmp_path / "outputs" / "mlruns"
+    assert local_metric.read_text(encoding="utf-8") == "1 0.5 1\n"
+    assert (
+        tmp_path / "outputs" / "mlruns" / "1" / "remote_run" / "metrics" / "loss"
+    ).read_text(encoding="utf-8") == "1 0.4 1\n"
 
 
 # /**
