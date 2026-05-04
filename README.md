@@ -30,6 +30,10 @@ For development checks:
 ```bash
 pip install -e ".[dev]"
 ```
+```bash
+ruff check src scripts
+mypy src
+```
 
 ## Main Train And Eval Workflow
 
@@ -64,6 +68,12 @@ bash scripts/main/train_eval.sh \
 ```
 
 The project also supports a two-machine workflow: training on one machine, uploading the trained checkpoint to Hugging Face Hub, and then downloading and evaluating it on another machine. This workflow is implemented in remote_train_upload.sh and load_eval.sh. These scripts, along with additional helper scripts, are described in report/docs/ADDITIONAL_SCRIPTS.md
+
+## Training logs
+
+Curated logs for reported runs are stored in `report/artifacts/logs`.
+Each run directory contains the resolved config and evaluation artifacts.
+Per-step training metrics are produced by the training pipeline and logged to MLflow / local run artifacts.
 
 ## Report
 
