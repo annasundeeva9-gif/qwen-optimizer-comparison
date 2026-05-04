@@ -22,15 +22,10 @@ from optimizer_comparison.evaluation.result_parser import write_lm_eval_summary_
 from optimizer_comparison.tracking.mlflow_logger import log_evaluation_run
 
 
-# /**
-#  * Загружает training result из run directory, к которому относится model source.
-#  *
-#  * @param model_source Локально доступные model/tokenizer artifacts.
-#  * @return Training result из result.json.
-#  */
 def load_training_result_for_evaluation(
     model_source: EvaluationModelSource,
 ) -> dict[str, Any]:
+    """Loads the training result for the evaluated model source."""
     if model_source.run_dir is None:
         raise ValueError("Evaluation model source must provide run_dir.")
 
@@ -44,19 +39,12 @@ def load_training_result_for_evaluation(
     return data
 
 
-# /**
-#  * Создает краткий result evaluation-запуска для локального сохранения и MLflow logging.
-#  *
-#  * @param training_result Training result исходной модели.
-#  * @param model_source Локально доступные model/tokenizer artifacts.
-#  * @param harness_paths Пути, созданные runner-ом lm-evaluation-harness.
-#  * @return Evaluation result в проектном формате.
-#  */
 def build_evaluation_result(
     training_result: dict[str, Any],
     model_source: EvaluationModelSource,
     harness_paths: dict[str, str],
 ) -> dict[str, Any]:
+    """Builds the project evaluation result for a trained model."""
     run_id = training_result.get("run_id", None)
     mlflow_run_id = training_result.get("mlflow_run_id", None)
     if run_id is None:
@@ -84,17 +72,11 @@ def build_evaluation_result(
     }
 
 
-# /**
-#  * Создает result evaluation-запуска для фиксированной базовой Qwen2.5-0.5B.
-#  *
-#  * @param model_source Source базовой модели, подготовленный model_source resolver-ом.
-#  * @param harness_paths Пути, созданные runner-ом lm-evaluation-harness.
-#  * @return Evaluation result без training metadata.
-#  */
 def build_base_model_evaluation_result(
     model_source: EvaluationModelSource,
     harness_paths: dict[str, str],
 ) -> dict[str, Any]:
+    """Builds the project evaluation result for the fixed base Qwen model."""
     return {
         "status": "completed",
         "run_id": BASE_QWEN_RUN_ID,
@@ -116,13 +98,8 @@ def build_base_model_evaluation_result(
     }
 
 
-# /**
-#  * Загружает MLflow run id из предыдущего evaluation_result.json, если он уже есть.
-#  *
-#  * @param evaluation_result_path Путь к project-level evaluation result.
-#  * @return MLflow run id предыдущего baseline evaluation или None.
-#  */
 def load_existing_evaluation_mlflow_run_id(evaluation_result_path: Path) -> str | None:
+    """Loads a previous baseline evaluation MLflow run id when present."""
     if not evaluation_result_path.is_file():
         return None
 
@@ -136,14 +113,8 @@ def load_existing_evaluation_mlflow_run_id(evaluation_result_path: Path) -> str 
     return str(mlflow_run_id)
 
 
-# /**
-#  * Возвращает путь для project-level evaluation result.
-#  *
-#  * @param config Полная конфигурация запуска.
-#  * @param model_source Локально доступные model/tokenizer artifacts.
-#  * @return Путь к evaluation_result.json.
-#  */
 def get_evaluation_result_path(config: DictConfig, model_source: EvaluationModelSource) -> Path:
+    """Returns the project-level evaluation result path."""
     if model_source.run_dir is None:
         raise ValueError("Evaluation model source must provide run_dir.")
 
@@ -151,25 +122,15 @@ def get_evaluation_result_path(config: DictConfig, model_source: EvaluationModel
     return model_source.run_dir / "evaluation" / result_filename
 
 
-# /**
-#  * Дописывает путь CSV summary к paths, созданным lm-evaluation-harness runner-ом.
-#  *
-#  * @param harness_paths Пути output и raw log от harness runner-а.
-#  * @return Копия harness paths с summary_path.
-#  */
 def add_evaluation_summary_path(harness_paths: dict[str, str]) -> dict[str, str]:
+    """Adds the evaluation summary CSV path to harness output paths."""
     summary_path = write_lm_eval_summary_csv(harness_paths["output_path"])
     return {**harness_paths, "summary_path": str(summary_path)}
 
 
-# /**
-#  * Запускает evaluation-пайплайн поверх lm-evaluation-harness.
-#  *
-#  * @param config Полная конфигурация запуска, собранная Hydra.
-#  * @return None. Результаты сохраняются в evaluation-директории training run-а.
-#  */
 @hydra.main(version_base=None, config_path="../../configs", config_name="config")
 def main(config: DictConfig) -> None:
+    """Runs the evaluation pipeline through lm-evaluation-harness."""
     model_source = resolve_evaluation_model_source(config)
     evaluation_result_path = get_evaluation_result_path(config=config, model_source=model_source)
 

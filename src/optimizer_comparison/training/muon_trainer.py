@@ -11,27 +11,16 @@ from transformers import Trainer
 from optimizer_comparison.optimizers.muon import Muon
 
 
-# /**
-#  * Trainer с переопределенным созданием Muon optimizer.
-#  */
 class MuonTrainer(Trainer):
-    # /**
-    #  * Сохраняет optimizer config для последующего создания Muon.
-    #  *
-    #  * @param optimizer_config Hydra optimizer config.
-    #  * @param kwargs Аргументы базового HuggingFace Trainer.
-    #  */
+    """Trainer that creates the Muon optimizer from Hydra config."""
+
     def __init__(self, optimizer_config: DictConfig, **kwargs: Any) -> None:
+        """Stores optimizer config for Muon creation."""
         super().__init__(**kwargs)
         self.optimizer_config = optimizer_config
 
-    # /**
-    #  * Создает Muon optimizer из Hydra config.
-    #  *
-    #  * @param model Модель, для которой Trainer создает optimizer.
-    #  * @return Optimizer, созданный через Muon.
-    #  */
     def create_optimizer(self, model: Any = None) -> Optimizer:
+        """Creates the Muon optimizer for the current model."""
         if self.optimizer is None:
             if model is None:
                 model = self.model

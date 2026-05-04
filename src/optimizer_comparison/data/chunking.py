@@ -14,28 +14,16 @@ from optimizer_comparison.data.dataset_loader import (
 )
 
 
-# /**
-#  * Возвращает eos_token_id из токенизатора.
-#  *
-#  * @param tokenizer Токенизатор HuggingFace или совместимый тестовый stub.
-#  * @return Идентификатор EOS-токена.
-#  */
 def get_eos_token_id(tokenizer: Any) -> int:
+    """Returns eos_token_id from the tokenizer."""
     eos_token_id = getattr(tokenizer, "eos_token_id", None)
     if eos_token_id is None:
         raise ValueError("Tokenizer must define eos_token_id for chunking.")
     return int(eos_token_id)
 
 
-# /**
-#  * Склеивает токенизированные тексты через EOS и режет поток на полные чанки.
-#  *
-#  * @param dataset Токенизированный Dataset одного split-а.
-#  * @param tokenizer Токенизатор с eos_token_id.
-#  * @param config Полная data-секция Hydra-конфига.
-#  * @return Dataset с чанками input_ids и attention_mask.
-#  */
 def chunk_tokenized_dataset(dataset: Dataset, tokenizer: Any, config: DictConfig) -> Dataset:
+    """Concatenates tokenized texts with EOS and splits them into full chunks."""
     if "input_ids" not in dataset.column_names:
         raise ValueError("Tokenized dataset must contain input_ids.")
 
@@ -63,19 +51,12 @@ def chunk_tokenized_dataset(dataset: Dataset, tokenizer: Any, config: DictConfig
     )
 
 
-# /**
-#  * Применяет chunking к train и validation split-ам независимо.
-#  *
-#  * @param tokenized_splits DatasetDict с токенизированными split-ами.
-#  * @param tokenizer Токенизатор с eos_token_id.
-#  * @param config Полная data-секция Hydra-конфига.
-#  * @return DatasetDict с финальными train и validation чанками.
-#  */
 def chunk_tokenized_splits(
     tokenized_splits: DatasetDict,
     tokenizer: Any,
     config: DictConfig,
 ) -> DatasetDict:
+    """Applies chunking to train and validation splits independently."""
     return DatasetDict(
         {
             "train": chunk_tokenized_dataset(tokenized_splits["train"], tokenizer, config),
@@ -88,19 +69,12 @@ def chunk_tokenized_splits(
     )
 
 
-# /**
-#  * Загружает final dataset с диска или строит чанки из tokenized split-а.
-#  *
-#  * @param tokenized_splits DatasetDict с токенизированными split-ами.
-#  * @param tokenizer Токенизатор с eos_token_id.
-#  * @param config Полная data-секция Hydra-конфига.
-#  * @return DatasetDict с финальными train и validation чанками.
-#  */
 def load_or_chunk_splits(
     tokenized_splits: DatasetDict,
     tokenizer: Any,
     config: DictConfig,
 ) -> DatasetDict:
+    """Loads the final dataset or builds chunks from tokenized splits."""
     final_dir = str(config.final.dir)
 
     if dataset_local_path_exists(final_dir) and not bool(config.final.force_reload):

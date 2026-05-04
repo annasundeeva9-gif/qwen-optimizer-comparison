@@ -7,12 +7,8 @@ import argparse
 from optimizer_comparison.artifacts.hf_hub import get_hf_token, upload_path_to_hf
 
 
-# /**
-#  * Создает parser для ручной загрузки одного artifact-а в Hugging Face Hub.
-#  *
-#  * @return ArgumentParser для CLI-скрипта.
-#  */
 def build_parser() -> argparse.ArgumentParser:
+    """Builds CLI parser for uploading one artifact to Hugging Face Hub."""
     parser = argparse.ArgumentParser(description="Upload one artifact to Hugging Face Hub.")
     parser.add_argument("--artifact-path", required=True)
     parser.add_argument("--repo-id", required=True)
@@ -21,13 +17,8 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-# /**
-#  * Запускает ручную загрузку одного artifact-а в Hugging Face Hub.
-#  *
-#  * @param argv CLI-аргументы или None для sys.argv.
-#  * @return None.
-#  */
 def main(argv: list[str] | None = None) -> None:
+    """Uploads one local artifact to Hugging Face Hub."""
     args = build_parser().parse_args(argv)
     token = get_hf_token(args.token_env_var)
     metadata = upload_path_to_hf(

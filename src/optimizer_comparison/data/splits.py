@@ -12,14 +12,8 @@ from optimizer_comparison.data.dataset_loader import (
 )
 
 
-# /**
-#  * Создает случайный train/validation split для raw или preprocessed датасета.
-#  *
-#  * @param dataset Dataset до токенизации.
-#  * @param config Полная data-секция Hydra-конфига.
-#  * @return DatasetDict с ключами train и validation.
-#  */
 def build_splits(dataset: Dataset, config: DictConfig) -> DatasetDict:
+    """Builds a random train/validation split."""
     split_config = config.split
     split_dataset = dataset.train_test_split(
         test_size=float(split_config.validation_size),
@@ -35,14 +29,8 @@ def build_splits(dataset: Dataset, config: DictConfig) -> DatasetDict:
     )
 
 
-# /**
-#  * Загружает split raw dataset с диска или создает его из preprocessed dataset.
-#  *
-#  * @param dataset Preprocessed dataset до токенизации.
-#  * @param config Полная data-секция Hydra-конфига.
-#  * @return DatasetDict с train/validation split-ами.
-#  */
 def load_or_build_splits(dataset: Dataset, config: DictConfig) -> DatasetDict:
+    """Loads split data or builds it from the preprocessed dataset."""
     split_raw_dir = str(config.split.dir)
 
     if dataset_local_path_exists(split_raw_dir) and not bool(config.split.force_reload):

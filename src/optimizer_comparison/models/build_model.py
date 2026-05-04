@@ -9,13 +9,8 @@ from omegaconf import DictConfig
 from transformers import AutoModelForCausalLM
 
 
-# /**
-#  * Преобразует строковое значение dtype из конфига в torch dtype.
-#  *
-#  * @param dtype_name Значение model.torch_dtype из Hydra-конфига.
-#  * @return torch dtype или None, если параметр не нужно передавать в HuggingFace.
-#  */
 def resolve_torch_dtype(dtype_name: str | None) -> torch.dtype | None:
+    """Converts a config dtype string into a torch dtype."""
     if dtype_name is None:
         return None
 
@@ -37,13 +32,8 @@ def resolve_torch_dtype(dtype_name: str | None) -> torch.dtype | None:
     return dtype
 
 
-# /**
-#  * Создает causal language model по Hydra-конфигу.
-#  *
-#  * @param config Конфигурация модели с именем checkpoint-а и параметрами загрузки.
-#  * @return HuggingFace causal language model.
-#  */
 def build_model(config: DictConfig) -> Any:
+    """Builds a causal language model from the Hydra model config."""
     model_name = config.get("pretrained_name_or_path", None)
     if model_name is None:
         raise ValueError("model.pretrained_name_or_path must be set for model loading.")

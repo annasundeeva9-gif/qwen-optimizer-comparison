@@ -28,13 +28,8 @@ REQUIRED_FINAL_SPLITS: tuple[str, ...] = ("train", "validation")
 REQUIRED_FINAL_COLUMNS: tuple[str, ...] = ("input_ids", "attention_mask")
 
 
-# /**
-#  * Возвращает последний checkpoint Trainer-а с явным типом для strict mypy.
-#  *
-#  * @param output_dir Директория output_dir из TrainingArguments.
-#  * @return Путь к последнему checkpoint-у или None, если checkpoint не найден.
-#  */
 def find_last_checkpoint(output_dir: Path) -> str | None:
+    """Returns the last Trainer checkpoint with an explicit type."""
     if not output_dir.exists():
         return None
     checkpoint = get_last_checkpoint(str(output_dir))  # type: ignore[no-untyped-call]
@@ -43,13 +38,8 @@ def find_last_checkpoint(output_dir: Path) -> str | None:
     return str(checkpoint)
 
 
-# /**
-#  * Возвращает checkpoint для resume существующего training run-а.
-#  *
-#  * @param run_dir Директория существующего run-а.
-#  * @return Путь к последнему checkpoint-у в trainer_output.
-#  */
 def find_resume_checkpoint(run_dir: str | Path) -> str:
+    """Returns the checkpoint used to resume an existing training run."""
     output_dir = Path(run_dir) / "trainer_output"
     checkpoint = find_last_checkpoint(output_dir)
     if checkpoint is None:
@@ -57,27 +47,16 @@ def find_resume_checkpoint(run_dir: str | Path) -> str:
     return checkpoint
 
 
-# /**
-#  * Возвращает best checkpoint Trainer-а с явным типом для strict mypy.
-#  *
-#  * @param trainer HuggingFace Trainer после завершения train().
-#  * @return Путь к best checkpoint-у или None, если Trainer его не выбрал.
-#  */
 def get_best_checkpoint(trainer: Trainer) -> str | None:
+    """Returns the best checkpoint selected by Trainer."""
     checkpoint = trainer.state.best_model_checkpoint
     if checkpoint is None:
         return None
     return checkpoint
 
 
-# /**
-#  * Проверяет один final split перед передачей в Trainer.
-#  *
-#  * @param dataset Split HuggingFace Dataset.
-#  * @param split_name Имя split-а для понятного текста ошибки.
-#  * @return None.
-#  */
 def validate_final_training_split(dataset: Dataset, split_name: str) -> None:
+    """Validates one final dataset split before passing it to Trainer."""
     missing_columns = [
         column_name
         for column_name in REQUIRED_FINAL_COLUMNS
@@ -89,13 +68,8 @@ def validate_final_training_split(dataset: Dataset, split_name: str) -> None:
         )
 
 
-# /**
-#  * Проверяет, что final dataset имеет split-ы и колонки, нужные training loop.
-#  *
-#  * @param dataset Загруженный HuggingFace DatasetDict.
-#  * @return None.
-#  */
 def validate_final_training_dataset(dataset: DatasetDict) -> None:
+    """Validates the final dataset splits and columns for training."""
     missing_splits = [
         split_name for split_name in REQUIRED_FINAL_SPLITS if split_name not in dataset
     ]
@@ -106,13 +80,8 @@ def validate_final_training_dataset(dataset: DatasetDict) -> None:
         validate_final_training_split(dataset=dataset[split_name], split_name=split_name)
 
 
-# /**
-#  * Возвращает final DatasetDict, при необходимости запуская data pipeline.
-#  *
-#  * @param config Полный Hydra-конфиг training run-а.
-#  * @return DatasetDict с train и validation split-ами.
-#  */
 def get_final_training_dataset(config: DictConfig) -> DatasetDict:
+    """Returns the final DatasetDict after running the data pipeline."""
     run_data_pipeline(config)
     final_dir = str(config.data.final.dir)
     if not dataset_local_path_exists(final_dir):
@@ -125,14 +94,9 @@ def get_final_training_dataset(config: DictConfig) -> DatasetDict:
     validate_final_training_dataset(dataset)
     return dataset
 
-# /**
-#  * Собирает TrainingArguments для стандартного HuggingFace Trainer.
-#  *
-#  * @param config Полный Hydra-конфиг запуска.
-#  * @param run_dir Директория конкретного запуска.
-#  * @return TrainingArguments для стандартного AdamW training path.
-#  */
+
 def build_training_arguments(config: DictConfig, run_dir: str | Path) -> TrainingArguments:
+    """Builds TrainingArguments for the HuggingFace Trainer."""
     training_config = config.training
     optimizer_config = config.optimizer
     adam_betas = list(
@@ -185,16 +149,6 @@ def build_training_arguments(config: DictConfig, run_dir: str | Path) -> Trainin
     )
 
 
-# /**
-#  * Создает стандартный HuggingFace Trainer для AdamW path.
-#  *
-#  * @param config Полный Hydra-конфиг запуска.
-#  * @param model Загруженная causal language model.
-#  * @param tokenizer Загруженный tokenizer.
-#  * @param dataset Final DatasetDict с train и validation split-ами.
-#  * @param run_dir Директория конкретного запуска.
-#  * @return HuggingFace Trainer со стандартным optimizer path.
-#  */
 def build_standard_trainer(
     config: DictConfig,
     model: Any,
@@ -202,6 +156,7 @@ def build_standard_trainer(
     dataset: DatasetDict,
     run_dir: str | Path,
 ) -> Trainer:
+    """Builds the standard HuggingFace Trainer for AdamW."""
     training_args = build_training_arguments(config=config, run_dir=run_dir)
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
 
@@ -215,16 +170,6 @@ def build_standard_trainer(
     )
 
 
-# /**
-#  * Создает Muon trainer, когда ручная интеграция Muon будет добавлена.
-#  *
-#  * @param config Полный Hydra-конфиг запуска.
-#  * @param model Загруженная causal language model.
-#  * @param tokenizer Загруженный tokenizer.
-#  * @param dataset Final DatasetDict с train и validation split-ами.
-#  * @param run_dir Директория конкретного запуска.
-#  * @return HuggingFace Trainer с Muon optimizer path.
-#  */
 def build_muon_trainer(
     config: DictConfig,
     model: Any,
@@ -232,6 +177,7 @@ def build_muon_trainer(
     dataset: DatasetDict,
     run_dir: str | Path,
 ) -> Trainer:
+    """Builds the HuggingFace Trainer with the Muon optimizer path."""
     training_args = build_training_arguments(config=config, run_dir=run_dir)
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
 
@@ -246,16 +192,6 @@ def build_muon_trainer(
     )
 
 
-# /**
-#  * Выбирает trainer path по единственному пользовательскому переключателю optimizer.name.
-#  *
-#  * @param config Полный Hydra-конфиг запуска.
-#  * @param model Загруженная causal language model.
-#  * @param tokenizer Загруженный tokenizer.
-#  * @param dataset Final DatasetDict с train и validation split-ами.
-#  * @param run_dir Директория конкретного запуска.
-#  * @return Trainer, соответствующий выбранному optimizer mode.
-#  */
 def build_trainer(
     config: DictConfig,
     model: Any,
@@ -263,6 +199,7 @@ def build_trainer(
     dataset: DatasetDict,
     run_dir: str | Path,
 ) -> Trainer:
+    """Selects the trainer path from optimizer.name."""
     optimizer_name = str(config.optimizer.name).lower()
     if optimizer_name == "adamw":
         return build_standard_trainer(
@@ -282,14 +219,9 @@ def build_trainer(
         )
     raise NotImplementedError(f"Unsupported optimizer for training: {optimizer_name}")
 
-# /**
-#  * Копирует checkpoint directory в стабильную best/last директорию run-а.
-#  *
-#  * @param source_dir Исходная директория checkpoint-а.
-#  * @param target_dir Целевая стабильная директория.
-#  * @return Путь к целевой директории.
-#  */
+
 def copy_checkpoint_dir(source_dir: str | Path, target_dir: str | Path) -> Path:
+    """Copies a checkpoint directory into a stable run directory."""
     source_path = Path(source_dir)
     target_path = Path(target_dir)
     if target_path.exists():
@@ -298,21 +230,13 @@ def copy_checkpoint_dir(source_dir: str | Path, target_dir: str | Path) -> Path:
     return target_path
 
 
-# /**
-#  * Сохраняет best и last checkpoints в стабильные директории run-а.
-#  *
-#  * @param trainer HuggingFace Trainer после завершения train().
-#  * @param run_dir Директория конкретного запуска.
-#  * @param tokenizer Загруженный tokenizer для fallback-сохранения.
-#  * @param config Полный Hydra-конфиг запуска.
-#  * @return Словарь с путями checkpoints root, best и last.
-#  */
 def save_best_and_last_checkpoints(
     trainer: Trainer,
     run_dir: str | Path,
     tokenizer: Any,
     config: DictConfig,
 ) -> dict[str, str]:
+    """Saves best and last checkpoints into stable run directories."""
     checkpoints_dir = Path(run_dir) / "checkpoints"
     checkpoints_dir.mkdir(parents=True, exist_ok=True)
     best_dir = checkpoints_dir / str(config.training.checkpoints.best_dir_name)
@@ -341,19 +265,12 @@ def save_best_and_last_checkpoints(
     }
 
 
-# /**
-#  * Сохраняет final model и tokenizer в стабильные директории run-а.
-#  *
-#  * @param trainer HuggingFace Trainer после завершения train().
-#  * @param tokenizer Загруженный tokenizer.
-#  * @param run_dir Директория конкретного запуска.
-#  * @return Словарь с путями model и tokenizer.
-#  */
 def save_final_model_artifacts(
     trainer: Trainer,
     tokenizer: Any,
     run_dir: str | Path,
 ) -> dict[str, str]:
+    """Saves the final model and tokenizer into stable run directories."""
     model_dir = Path(run_dir) / "model"
     tokenizer_dir = Path(run_dir) / "tokenizer"
 
@@ -366,14 +283,8 @@ def save_final_model_artifacts(
     }
 
 
-# /**
-#  * Запускает настоящий training loop.
-#  *
-#  * @param config Полная конфигурация обучения.
-#  * @param run_dir Директория конкретного запуска.
-#  * @return Training-result в общем формате с метриками и путями к артефактам.
-#  */
 def run_training(config: DictConfig, run_dir: str | Path) -> TrainingResult:
+    """Runs the real training loop."""
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA is required for real training runs.")
     set_seed(int(config.training.seed))

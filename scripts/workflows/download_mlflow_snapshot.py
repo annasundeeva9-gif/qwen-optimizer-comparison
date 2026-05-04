@@ -11,12 +11,8 @@ from optimizer_comparison.artifacts.hf_hub import (
 )
 
 
-# /**
-#  * Создает parser для скачивания MLflow snapshot-а из Hugging Face Hub.
-#  *
-#  * @return ArgumentParser для CLI-скрипта.
-#  */
 def build_parser() -> argparse.ArgumentParser:
+    """Builds CLI parser for downloading an MLflow snapshot from Hugging Face Hub."""
     parser = argparse.ArgumentParser(description="Download and merge MLflow snapshot.")
     parser.add_argument("--repo-id", required=True)
     parser.add_argument("--repo-path", default="mlflow/mlruns_after_remote_train.zip")
@@ -28,13 +24,8 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-# /**
-#  * Скачивает zip snapshot MLflow и сливает его с локальным outputs/mlruns.
-#  *
-#  * @param argv CLI-аргументы или None для sys.argv.
-#  * @return None.
-#  */
 def main(argv: list[str] | None = None) -> None:
+    """Downloads a zipped MLflow snapshot and merges it into local outputs/mlruns."""
     args = build_parser().parse_args(argv)
     token = get_hf_token(args.token_env_var)
     archive_path = download_file_from_hf(

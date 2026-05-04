@@ -14,12 +14,8 @@ BASE_QWEN_RUN_ID = "__base_qwen_2_5_0_5b__"
 PREFERRED_QUALITY_METRICS = ("acc_norm,none", "acc,none")
 
 
-# /**
-#  * Создает parser для сборки таблицы по критериям исходного задания.
-#  *
-#  * @return Parser с позиционными run_id и путями входа/выхода.
-#  */
 def build_parser() -> argparse.ArgumentParser:
+    """Builds the CLI parser for task metrics table export."""
     parser = argparse.ArgumentParser(description="Export task metrics table for selected runs.")
     parser.add_argument("run_ids", nargs="+")
     parser.add_argument("--runs-dir", default="outputs/runs")
@@ -28,27 +24,16 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-# /**
-#  * Загружает JSON-файл как словарь.
-#  *
-#  * @param path Путь к JSON-файлу.
-#  * @return Словарь из JSON-файла.
-#  */
 def load_json_dict(path: Path) -> dict[str, Any]:
+    """Loads a JSON object from disk."""
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise TypeError(f"JSON file must contain an object: {path}")
     return data
 
 
-# /**
-#  * Возвращает последнее числовое значение метрики из history.
-#  *
-#  * @param history История логов Trainer из result.json.
-#  * @param metric_name Имя метрики, например eval_loss.
-#  * @return Последнее числовое значение или None.
-#  */
 def find_last_history_metric(history: object, metric_name: str) -> float | None:
+    """Finds the last numeric metric value in Trainer history."""
     if not isinstance(history, list):
         return None
 
@@ -62,13 +47,8 @@ def find_last_history_metric(history: object, metric_name: str) -> float | None:
     return last_value
 
 
-# /**
-#  * Загружает строки evaluation_summary.csv.
-#  *
-#  * @param summary_path Путь к evaluation_summary.csv.
-#  * @return Список строк CSV как словарей.
-#  */
 def load_evaluation_summary_rows(summary_path: Path) -> list[dict[str, str]]:
+    """Loads rows from evaluation_summary.csv."""
     if not summary_path.is_file():
         return []
 
@@ -76,16 +56,8 @@ def load_evaluation_summary_rows(summary_path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(file))
 
 
-# /**
-#  * Выбирает одну quality-метрику на task и усредняет ее по harness tasks.
-#  *
-#  * Для задач с acc_norm используется acc_norm, иначе acc. Это дает компактный
-#  * avg_harness_score для сводной таблицы без ручного выбора отдельного benchmark-а.
-#  *
-#  * @param summary_rows Строки evaluation_summary.csv.
-#  * @return Среднее качество модели по задачам или None.
-#  */
 def calculate_avg_harness_score(summary_rows: list[dict[str, str]]) -> float | None:
+    """Calculates one average quality metric across harness tasks."""
     values_by_task: dict[str, float] = {}
     rows_by_task: dict[str, list[dict[str, str]]] = {}
     for row in summary_rows:
@@ -112,27 +84,15 @@ def calculate_avg_harness_score(summary_rows: list[dict[str, str]]) -> float | N
     return sum(values_by_task.values()) / len(values_by_task)
 
 
-# /**
-#  * Форматирует числовое значение для CSV.
-#  *
-#  * @param value Значение метрики или None.
-#  * @param digits Количество знаков после запятой.
-#  * @return Строка с числом или прочерк.
-#  */
 def format_metric(value: object, digits: int = 4) -> str:
+    """Formats a numeric metric for CSV output."""
     if isinstance(value, int | float) and not isinstance(value, bool):
         return f"{float(value):.{digits}f}"
     return "-"
 
 
-# /**
-#  * Собирает строку таблицы для evaluation базовой модели без training-метрик.
-#  *
-#  * @param run_id Идентификатор baseline run-а.
-#  * @param run_dir Директория baseline run-а.
-#  * @return Строка CSV по критериям задания.
-#  */
 def build_base_model_row(run_id: str, run_dir: Path) -> dict[str, str]:
+    """Builds the task metrics row for the base model evaluation."""
     avg_harness_score = calculate_avg_harness_score(
         load_evaluation_summary_rows(run_dir / "evaluation" / "evaluation_summary.csv")
     )
@@ -147,14 +107,8 @@ def build_base_model_row(run_id: str, run_dir: Path) -> dict[str, str]:
     }
 
 
-# /**
-#  * Собирает строку таблицы по критериям задания из training/evaluation artifacts.
-#  *
-#  * @param run_id Идентификатор run-а.
-#  * @param runs_dir Директория outputs/runs.
-#  * @return Строка CSV по критериям задания.
-#  */
 def build_task_metrics_row(run_id: str, runs_dir: Path) -> dict[str, str]:
+    """Builds one task metrics row from run artifacts."""
     run_dir = runs_dir / run_id
     if run_id == BASE_QWEN_RUN_ID:
         return build_base_model_row(run_id=run_id, run_dir=run_dir)
@@ -193,14 +147,8 @@ def build_task_metrics_row(run_id: str, runs_dir: Path) -> dict[str, str]:
     }
 
 
-# /**
-#  * Записывает строки task metrics table в CSV.
-#  *
-#  * @param rows Строки таблицы.
-#  * @param output_path Путь к выходному CSV.
-#  * @return None.
-#  */
 def write_task_metrics_csv(rows: list[dict[str, str]], output_path: Path) -> None:
+    """Writes task metrics rows to CSV."""
     columns = build_task_metrics_columns()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8", newline="") as file:
@@ -210,12 +158,8 @@ def write_task_metrics_csv(rows: list[dict[str, str]], output_path: Path) -> Non
             writer.writerow({column: row.get(column, "") for column in columns})
 
 
-# /**
-#  * Возвращает порядок колонок task metrics table.
-#  *
-#  * @return Список колонок CSV/LaTeX.
-#  */
 def build_task_metrics_columns() -> list[str]:
+    """Returns the task metrics table column order."""
     return [
         "optimizer",
         "lr",
@@ -226,13 +170,8 @@ def build_task_metrics_columns() -> list[str]:
     ]
 
 
-# /**
-#  * Экранирует значение для LaTeX tabular.
-#  *
-#  * @param value Значение ячейки.
-#  * @return Экранированная строка.
-#  */
 def escape_latex(value: str) -> str:
+    """Escapes a value for LaTeX tabular output."""
     replacements = {
         "\\": r"\textbackslash{}",
         "&": r"\&",
@@ -248,14 +187,8 @@ def escape_latex(value: str) -> str:
     return "".join(replacements.get(char, char) for char in value)
 
 
-# /**
-#  * Записывает task metrics rows в простой LaTeX tabular.
-#  *
-#  * @param rows Строки таблицы.
-#  * @param output_path Путь к выходному tex-файлу.
-#  * @return None.
-#  */
 def write_task_metrics_latex(rows: list[dict[str, str]], output_path: Path) -> None:
+    """Writes task metrics rows as a simple LaTeX tabular."""
     columns = build_task_metrics_columns()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as file:
@@ -272,13 +205,8 @@ def write_task_metrics_latex(rows: list[dict[str, str]], output_path: Path) -> N
         file.write("\\end{tabular}\n")
 
 
-# /**
-#  * Точка входа CLI для сборки task metrics CSV.
-#  *
-#  * @param argv CLI-аргументы или None для чтения из sys.argv.
-#  * @return None.
-#  */
 def main(argv: list[str] | None = None) -> None:
+    """Runs the task metrics table export CLI."""
     args = build_parser().parse_args(argv)
     runs_dir = Path(args.runs_dir)
     rows = [build_task_metrics_row(run_id=run_id, runs_dir=runs_dir) for run_id in args.run_ids]

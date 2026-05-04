@@ -8,47 +8,25 @@ from pathlib import Path
 from typing import Any
 
 
-# /**
-#  * Проверяет, что значение можно логировать как scalar metric.
-#  *
-#  * @param value Значение из JSON lm-evaluation-harness.
-#  * @return True, если значение является числовой scalar-метрикой.
-#  */
 def is_scalar_metric(value: object) -> bool:
+    """Checks whether a value can be logged as a scalar metric."""
     return isinstance(value, int | float) and not isinstance(value, bool)
 
 
-# /**
-#  * Нормализует имя task metric для MLflow.
-#  *
-#  * @param task_name Имя evaluation task.
-#  * @param metric_name Имя metric из lm-evaluation-harness.
-#  * @return Имя metric с префиксом eval_harness.
-#  */
 def build_metric_name(task_name: str, metric_name: str) -> str:
+    """Builds the MLflow metric name for one evaluation task metric."""
     normalized_metric_name = metric_name.replace(",", "/")
     return f"eval_harness/{task_name}/{normalized_metric_name}"
 
 
-# /**
-#  * Возвращает true для основной evaluation-метрики без stderr и служебных полей.
-#  *
-#  * @param metric_name Имя metric из lm-evaluation-harness.
-#  * @param metric_value Значение metric из lm-evaluation-harness.
-#  * @return True, если metric нужно логировать в MLflow как основное число.
-#  */
 def is_primary_lm_eval_metric(metric_name: str, metric_value: object) -> bool:
+    """Checks whether a harness metric is a primary metric without stderr."""
     base_name = metric_name.split(",", maxsplit=1)[0]
     return is_scalar_metric(metric_value) and not base_name.endswith("_stderr")
 
 
-# /**
-#  * Извлекает основные scalar-метрики из секции results JSON-а lm-evaluation-harness.
-#  *
-#  * @param results Секция results из JSON-а.
-#  * @return Flat-словарь основных scalar metrics для MLflow.
-#  */
 def flatten_lm_eval_metrics(results: dict[str, object]) -> dict[str, float]:
+    """Extracts primary scalar metrics from the harness results section."""
     metrics: dict[str, float] = {}
     for task_name, task_result in results.items():
         if not isinstance(task_result, dict):
@@ -61,26 +39,16 @@ def flatten_lm_eval_metrics(results: dict[str, object]) -> dict[str, float]:
     return metrics
 
 
-# /**
-#  * Возвращает имя stderr-метрики для основной lm-evaluation-harness metric.
-#  *
-#  * @param metric_name Имя основной metric, например acc,none.
-#  * @return Имя stderr metric, например acc_stderr,none.
-#  */
 def build_stderr_metric_name(metric_name: str) -> str:
+    """Builds the stderr metric name for a primary harness metric."""
     if "," not in metric_name:
         return f"{metric_name}_stderr"
     base_name, suffix = metric_name.split(",", maxsplit=1)
     return f"{base_name}_stderr,{suffix}"
 
 
-# /**
-#  * Собирает строки компактной CSV-таблицы из results JSON-а lm-evaluation-harness.
-#  *
-#  * @param results Секция results из JSON-а.
-#  * @return Список строк с task, metric, value и stderr.
-#  */
 def build_lm_eval_summary_rows(results: dict[str, object]) -> list[dict[str, str]]:
+    """Builds compact CSV summary rows from harness results."""
     rows: list[dict[str, str]] = []
     for task_name, task_result in results.items():
         if not isinstance(task_result, dict):
@@ -108,17 +76,11 @@ def build_lm_eval_summary_rows(results: dict[str, object]) -> list[dict[str, str
     return rows
 
 
-# /**
-#  * Записывает компактную CSV-таблицу evaluation results рядом с artifacts запуска.
-#  *
-#  * @param result_path Путь к JSON-файлу lm-evaluation-harness.
-#  * @param output_path Путь к CSV-файлу или None для evaluation_summary.csv рядом с JSON.
-#  * @return Путь к записанной CSV-таблице.
-#  */
 def write_lm_eval_summary_csv(
     result_path: str | Path,
     output_path: str | Path | None = None,
 ) -> Path:
+    """Writes a compact evaluation summary CSV next to run artifacts."""
     parsed = parse_lm_eval_results(result_path)
     csv_path = Path(output_path) if output_path is not None else Path(result_path).with_name(
         "evaluation_summary.csv"
@@ -140,13 +102,8 @@ def write_lm_eval_summary_csv(
     return csv_path
 
 
-# /**
-#  * Парсит оригинальный JSON результатов lm-evaluation-harness.
-#  *
-#  * @param result_path Путь к JSON-файлу lm-evaluation-harness.
-#  * @return Нормализованный словарь с flat metrics и полезной metadata.
-#  */
 def parse_lm_eval_results(result_path: str | Path) -> dict[str, Any]:
+    """Parses the original lm-evaluation-harness result JSON."""
     path = Path(result_path)
     if not path.is_file():
         raise FileNotFoundError(f"lm-evaluation-harness result file does not exist: {result_path}")

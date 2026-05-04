@@ -13,9 +13,9 @@ The evaluation tasks are `piqa`, `arc_easy`, `arc_challenge`, `winogrande`, and 
 
 ## Environment
 
-Use a Linux machine with a CUDA-capable GPU. The main workflow scripts are Bash scripts and are intended to run from the repository root.
+Use a Linux machine with a CUDA-capable GPU. The main workflow scripts are Bash scripts and are intended to be run from the repository root.
 
-Create and activate a virtual environment, install PyTorch with CUDA support.
+Create and activate a virtual environment, then install PyTorch with CUDA support:
 
 ```bash
 python -m venv .venv
@@ -35,13 +35,13 @@ pip install -e ".[dev]"
 
 The expected full workflow is `scripts/main/train_eval.sh`. It trains a model, evaluates the trained checkpoint with lm-evaluation-harness, and writes local artifacts and MLflow logs. 
 
-A useful smoke test on a subset of the dataset, with a small model, and on a subset of validation examples before a full run:
+A smoke test can be run on a small model, a subset of the dataset, and a limited number of validation examples before launching a full experiment:
 
 ```bash
 bash scripts/workflows/smoke.sh --optimizer <type> --experiment <name>
 ```
 
-Launching the full run:
+To launch a full run:
 
 ```bash
 bash scripts/main/train_eval.sh \
@@ -50,27 +50,26 @@ bash scripts/main/train_eval.sh \
   --optimizer <type> \
   --experiment <name>
 ```
-Available optimizers: adam/muon. For the hybrid Muon+AdamW variant add:
+Available optimizer types: adamw, muon.
+
+For the hybrid Muon + AdamW variant, use the Muon optimizer with a limited number of Muon-routed layers, for example:
 
 ```bash
-optimizer.muon_layer_count=12
+bash scripts/main/train_eval.sh \
+  --mode full \
+  --model qwen_0_5b \
+  --optimizer muon \
+  --experiment hybrid_l12 \
+  optimizer.muon_layer_count=12
 ```
 
-The project also supports an additional pipeline, which involves launching on one machine, saving the results via a hugging face hub, and then loading and running validation on another with scripts remote_train_upload.sh and load_eval.sh.
+The project also supports a two-machine workflow: training on one machine, uploading the trained checkpoint to Hugging Face Hub, and then downloading and evaluating it on another machine. This workflow is implemented in remote_train_upload.sh and load_eval.sh. These scripts, along with additional helper scripts, are described in report/docs/ADDITIONAL_SCRIPTS.md
 
-## Reproducing report figures and tables
+## Report
 
-All training and evaluation artifacts are stored with run_id = name_timestamp:
+This repository includes a short summary of the experimental results below. The full report is available as a LaTeX document and as a compiled PDF: 
 
-```text
-outputs/runs/<run_id>/
-```
-To get the results from the report, run scripts export_comparison_table, export_task_metrics_table, export_short_comparison_table
+ - report/docs/main_report.tex
+ - report/docs/main_report.pdf
 
-```bash
-python -m optimizer_comparison.reports.<script> \
-  <run_id> \
-  ... \
-  <run_id> \
-  --output outputs/reports/<name>
-```
+In this project, AdamW, Muon, and a hybrid Muon + AdamW strategy were compared for full fine-tuning of Qwen2.5-0.5B. The experiments track training loss, learning rate, elapsed time, and resource usage, and final model quality is evaluated with lm-evaluation-harness. The results show that Muon is sensitive to the learning rate and can perform close to AdamW when tuned carefully, while an overly large learning rate noticeably hurts convergence. The hybrid strategy shows intermediate behavior and can be considered a practical compromise, but the current experiments are limited by the number of runs, the fixed seed, and the size of the hyperparameter search.

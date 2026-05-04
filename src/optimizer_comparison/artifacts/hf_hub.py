@@ -15,36 +15,21 @@ from optimizer_comparison.artifacts.local_store import save_json
 from optimizer_comparison.training.result_contract import TrainingResult
 
 
-# /**
-#  * Возвращает true, если удаленное сохранение включено в конфиге.
-#  *
-#  * @param config Полный Hydra-конфиг запуска.
-#  * @return True, если artifacts.hf_hub.use=true.
-#  */
 def should_use_hf_hub(config: DictConfig) -> bool:
+    """Checks whether Hugging Face Hub artifact persistence is enabled."""
     return bool(config.get("artifacts", {}).get("hf_hub", {}).get("use", False))
 
 
-# /**
-#  * Возвращает HF token из переменной окружения.
-#  *
-#  * @param token_env_var Имя переменной окружения с HF token.
-#  * @return Значение token.
-#  */
 def get_hf_token(token_env_var: str) -> str:
+    """Reads the Hugging Face token from an environment variable."""
     token = os.environ.get(token_env_var)
     if not token:
         raise ValueError(f"Hugging Face token env var is not set: {token_env_var}")
     return token
 
 
-# /**
-#  * Проверяет HF Hub настройки до начала реального обучения.
-#  *
-#  * @param config Полный Hydra-конфиг запуска.
-#  * @return None.
-#  */
 def validate_hf_hub_before_training(config: DictConfig) -> None:
+    """Validates Hugging Face Hub settings before real training starts."""
     hf_hub_config = config.get("artifacts", {}).get("hf_hub", {})
     use_hf_hub = bool(hf_hub_config.get("use", False))
 
@@ -58,17 +43,6 @@ def validate_hf_hub_before_training(config: DictConfig) -> None:
     get_hf_token(str(hf_hub_config.get("token_env_var", "HF_TOKEN")))
 
 
-# /**
-#  * Загружает файл или директорию в Hugging Face Hub.
-#  *
-#  * @param artifact_path Локальный файл или директория.
-#  * @param repo_id Идентификатор HF repo.
-#  * @param repo_path Путь внутри repo.
-#  * @param token HF token.
-#  * @param commit_message Сообщение commit-а.
-#  * @param api Опциональный HfApi для тестов.
-#  * @return Метаданные commit-а.
-#  */
 def upload_path_to_hf(
     artifact_path: str | Path,
     repo_id: str,
@@ -77,6 +51,7 @@ def upload_path_to_hf(
     commit_message: str = "Upload training artifact",
     api: HfApi | None = None,
 ) -> dict[str, str | None]:
+    """Uploads a local file or directory to Hugging Face Hub."""
     hf_api = api or HfApi()
     local_path = Path(artifact_path)
 
@@ -105,16 +80,6 @@ def upload_path_to_hf(
     }
 
 
-# /**
-#  * Загружает run artifacts из Hugging Face Hub в локальную директорию.
-#  *
-#  * @param repo_id Идентификатор HF repo.
-#  * @param target_dir Локальная директория для восстановления artifacts.
-#  * @param repo_path Путь artifacts внутри repo.
-#  * @param token HF token или None для публичного repo.
-#  * @param revision Revision или commit sha.
-#  * @return Путь к восстановленной локальной директории.
-#  */
 def download_artifacts_from_hf(
     repo_id: str,
     target_dir: str | Path,
@@ -122,6 +87,7 @@ def download_artifacts_from_hf(
     token: str | None = None,
     revision: str | None = None,
 ) -> Path:
+    """Downloads run artifacts from Hugging Face Hub into a local directory."""
     target_path = Path(target_dir)
     allow_patterns = [f"{repo_path}/**"] if repo_path else None
     snapshot_download(
@@ -134,16 +100,6 @@ def download_artifacts_from_hf(
     return target_path / repo_path if repo_path else target_path
 
 
-# /**
-#  * Загружает один файл из Hugging Face Hub в локальную директорию.
-#  *
-#  * @param repo_id Идентификатор HF repo.
-#  * @param target_dir Локальная директория для скачивания.
-#  * @param repo_path Путь файла внутри repo.
-#  * @param token HF token или None для публичного repo.
-#  * @param revision Revision или commit sha.
-#  * @return Путь к скачанному файлу.
-#  */
 def download_file_from_hf(
     repo_id: str,
     target_dir: str | Path,
@@ -151,6 +107,7 @@ def download_file_from_hf(
     token: str | None = None,
     revision: str | None = None,
 ) -> Path:
+    """Downloads one file from Hugging Face Hub into a local directory."""
     target_path = Path(target_dir)
     snapshot_download(
         repo_id=repo_id,
@@ -169,14 +126,8 @@ def download_file_from_hf(
     return downloaded_path
 
 
-# /**
-#  * Сливает содержимое одной директории в другую без удаления уже существующих подпапок.
-#  *
-#  * @param source_dir Директория-источник.
-#  * @param target_dir Целевая директория.
-#  * @return None.
-#  */
 def merge_directory_contents(source_dir: str | Path, target_dir: str | Path) -> None:
+    """Merges one directory into another without deleting existing subdirectories."""
     source_path = Path(source_dir)
     target_path = Path(target_dir)
     if not source_path.is_dir():
@@ -186,17 +137,8 @@ def merge_directory_contents(source_dir: str | Path, target_dir: str | Path) -> 
     shutil.copytree(source_path, target_path, dirs_exist_ok=True)
 
 
-# /**
-#  * Обновляет artifact_location у локальных MLflow experiments после переноса file store.
-#  *
-#  * MLflow file store хранит абсолютный URI в meta.yaml. После скачивания snapshot-а с
-#  * удаленной Linux-машины этот URI может указывать на /root/work/... и ломать локальное
-#  * логирование artifacts на Windows.
-#  *
-#  * @param mlruns_dir Локальная директория MLflow file store.
-#  * @return None.
-#  */
 def update_mlflow_experiment_artifact_locations(mlruns_dir: str | Path) -> None:
+    """Updates MLflow experiment artifact locations after moving a file store."""
     root = Path(mlruns_dir)
     if not root.is_dir():
         return
@@ -220,22 +162,12 @@ def update_mlflow_experiment_artifact_locations(mlruns_dir: str | Path) -> None:
         meta_path.write_text("\n".join(updated_lines) + "\n", encoding="utf-8")
 
 
-# /**
-#  * Распаковывает zip snapshot MLflow и сливает его с локальным file store.
-#  *
-#  * Snapshot должен содержать верхнеуровневую директорию mlruns, как архивы,
-#  * созданные create_mlflow_snapshot_archive().
-#  *
-#  * @param archive_path Путь к zip snapshot-у.
-#  * @param target_mlruns_dir Локальная директория outputs/mlruns.
-#  * @param extract_dir Временная директория для распаковки.
-#  * @return Путь к локальной директории MLflow после merge.
-#  */
 def merge_mlflow_snapshot_archive(
     archive_path: str | Path,
     target_mlruns_dir: str | Path,
     extract_dir: str | Path,
 ) -> Path:
+    """Extracts a zipped MLflow snapshot and merges it with the local file store."""
     archive = Path(archive_path)
     if not archive.is_file():
         raise FileNotFoundError(f"MLflow snapshot archive does not exist: {archive_path}")
@@ -260,19 +192,12 @@ def merge_mlflow_snapshot_archive(
     return target_path
 
 
-# /**
-#  * Создает zip-архив локального MLflow file store.
-#  *
-#  * @param mlruns_dir Локальная директория MLflow file store.
-#  * @param output_dir Директория для snapshot-архива.
-#  * @param archive_name Имя архива без расширения.
-#  * @return Путь к созданному zip-архиву.
-#  */
 def create_mlflow_snapshot_archive(
     mlruns_dir: str | Path,
     output_dir: str | Path,
     archive_name: str = "mlruns_snapshot",
 ) -> Path:
+    """Creates a zip archive from the local MLflow file store."""
     mlruns_path = Path(mlruns_dir)
     if not mlruns_path.is_dir():
         raise FileNotFoundError(f"MLflow directory does not exist: {mlruns_dir}")
@@ -292,16 +217,6 @@ def create_mlflow_snapshot_archive(
     return Path(created_archive)
 
 
-# /**
-#  * Загружает zip snapshot MLflow file store в Hugging Face Hub.
-#  *
-#  * @param mlruns_dir Локальная директория MLflow file store.
-#  * @param repo_id Идентификатор HF repo.
-#  * @param token HF token.
-#  * @param repo_path Путь zip-архива внутри repo.
-#  * @param snapshot_dir Локальная директория для временного snapshot-архива.
-#  * @return Метаданные upload-а.
-#  */
 def upload_mlflow_snapshot_to_hf(
     mlruns_dir: str | Path,
     repo_id: str,
@@ -309,6 +224,7 @@ def upload_mlflow_snapshot_to_hf(
     repo_path: str = "mlflow/mlruns_snapshot.zip",
     snapshot_dir: str | Path = "outputs/mlflow_snapshots",
 ) -> dict[str, str | None]:
+    """Uploads a zipped MLflow file store snapshot to Hugging Face Hub."""
     archive_path = create_mlflow_snapshot_archive(
         mlruns_dir=mlruns_dir,
         output_dir=snapshot_dir,
@@ -322,19 +238,12 @@ def upload_mlflow_snapshot_to_hf(
     )
 
 
-# /**
-#  * Записывает статус HF Hub upload в training-result.
-#  *
-#  * @param result Training-result, который нужно обновить.
-#  * @param status Статус upload.
-#  * @param error Текст ошибки или None.
-#  * @return Обновленный training-result.
-#  */
 def set_hf_upload_status(
     result: TrainingResult,
     status: str,
     error: str | None = None,
 ) -> TrainingResult:
+    """Writes Hugging Face Hub upload status into the training result."""
     artifacts = result.get("artifacts", {})
     if not isinstance(artifacts, dict):
         raise TypeError("Training result artifacts must be a dictionary.")
@@ -354,13 +263,8 @@ def set_hf_upload_status(
     return result
 
 
-# /**
-#  * Удаляет локальные resume-checkpoint artifacts после успешного HF Hub upload.
-#  *
-#  * @param result Training-result с локальными путями artifacts.
-#  * @return Training-result с обновленным статусом cleanup-а.
-#  */
 def cleanup_local_checkpoint_artifacts(result: TrainingResult) -> TrainingResult:
+    """Removes local checkpoint artifacts after a successful Hugging Face Hub upload."""
     artifacts = result.get("artifacts", {})
     if not isinstance(artifacts, dict):
         raise TypeError("Training result artifacts must be a dictionary.")
@@ -400,17 +304,11 @@ def cleanup_local_checkpoint_artifacts(result: TrainingResult) -> TrainingResult
     return result
 
 
-# /**
-#  * Загружает основные artifacts training run-а в Hugging Face Hub.
-#  *
-#  * @param config Полный Hydra-конфиг запуска.
-#  * @param result Training-result с локальными путями artifacts.
-#  * @return Training-result с HF Hub metadata.
-#  */
 def persist_training_artifacts_to_hf(
     config: DictConfig,
     result: TrainingResult,
 ) -> TrainingResult:
+    """Uploads the main training run artifacts to Hugging Face Hub."""
     if not should_use_hf_hub(config):
         return set_hf_upload_status(result=result, status="skipped")
 
@@ -476,21 +374,13 @@ def persist_training_artifacts_to_hf(
     return result
 
 
-# /**
-#  * Загружает локальные model/tokenizer/config/result artifacts одного run-а.
-#  *
-#  * @param result Training-result с локальными путями artifacts.
-#  * @param repo_id Идентификатор HF repo.
-#  * @param token HF token.
-#  * @param experiment_name Имя эксперимента.
-#  * @return HF Hub metadata для result.json и MLflow.
-#  */
 def upload_training_artifact_paths(
     result: TrainingResult,
     repo_id: str,
     token: str,
     experiment_name: str,
 ) -> dict[str, str | None]:
+    """Uploads local model, tokenizer, config, and result artifacts for one run."""
     artifacts = result.get("artifacts", {})
     if not isinstance(artifacts, dict):
         raise TypeError("Training result artifacts must be a dictionary.")

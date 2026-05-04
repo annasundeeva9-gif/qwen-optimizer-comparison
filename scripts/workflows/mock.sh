@@ -6,7 +6,7 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 cd "${PROJECT_ROOT}"
 
-bash scripts/main/train.sh \
+bash scripts/workflows/train.sh \
   --mode mock \
   --model mock \
   --optimizer adamw \

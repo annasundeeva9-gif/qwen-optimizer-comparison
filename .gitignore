@@ -18,6 +18,8 @@ dist/
 # Working markdown notes
 *.md
 !README.md
+!MAIN_TASK.md
+!ADDITIONAL_SCRIPTS.md
 
 # Local data and experiment outputs
 outputs/*

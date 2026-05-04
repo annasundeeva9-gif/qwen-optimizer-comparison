@@ -16,7 +16,7 @@ RUNS=(
 
 for args in "${RUNS[@]}"; do
   echo "Starting training grid run: ${args}"
-  bash scripts/main/train.sh ${args}
+  bash scripts/workflows/train.sh ${args}
 done
 
 if [[ -n "${HF_REPO_ID}" ]]; then

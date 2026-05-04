@@ -17,19 +17,10 @@ BASE_QWEN_RUN_NAME = "base_qwen_2_5_0_5b"
 BASE_QWEN_RUN_DIR = "outputs/runs/__base_qwen_2_5_0_5b__"
 
 
-# /**
-#  * Описывает локально доступные model/tokenizer artifacts для evaluation.
-#  *
-#  * @param source_type Тип источника: local, hf_hub или base_model.
-#  * @param run_dir Локальная директория training run-а, если она известна.
-#  * @param model_path Локальный путь к модели или фиксированный HF id для base model.
-#  * @param tokenizer_path Локальный путь к токенизатору или фиксированный HF id для base model.
-#  * @param hf_repo_id HF repo id, если artifacts восстановлены из Hub.
-#  * @param hf_artifact_path Путь artifacts внутри HF repo, если использовался Hub.
-#  * @param hf_revision Revision HF repo, если он задан.
-#  */
 @dataclass(frozen=True)
 class EvaluationModelSource:
+    """Describes locally available model and tokenizer artifacts for evaluation."""
+
     source_type: str
     run_dir: Path | None
     model_path: Path | str
@@ -39,13 +30,8 @@ class EvaluationModelSource:
     hf_revision: str | None = None
 
 
-# /**
-#  * Возвращает evaluation.source из полного или evaluation-only конфига.
-#  *
-#  * @param config Полный Hydra-конфиг или только evaluation-секция.
-#  * @return Конфиг source.
-#  */
 def get_evaluation_source_config(config: DictConfig) -> DictConfig:
+    """Returns evaluation.source from a full or evaluation-only config."""
     evaluation_config = config.get("evaluation", None)
     if isinstance(evaluation_config, DictConfig):
         source_config = evaluation_config.get("source", None)
@@ -57,14 +43,8 @@ def get_evaluation_source_config(config: DictConfig) -> DictConfig:
     return source_config
 
 
-# /**
-#  * Проверяет, что путь указывает на существующую директорию artifact-а.
-#  *
-#  * @param path Путь из конфига.
-#  * @param field_name Имя поля для понятного текста ошибки.
-#  * @return Абсолютный путь к директории.
-#  */
 def resolve_existing_artifact_dir(path: str | Path | None, field_name: str) -> Path:
+    """Resolves and validates an existing artifact directory."""
     if path is None:
         raise ValueError(f"{field_name} must be set for evaluation.")
 
@@ -73,17 +53,14 @@ def resolve_existing_artifact_dir(path: str | Path | None, field_name: str) -> P
         raise FileNotFoundError(f"{field_name} does not exist or is not a directory: {path}")
     return resolved_path
 
-# /**
-#  * Разрешает локальный source model/tokenizer artifacts.
-#  *
-#  * @param source_config Evaluation source-конфиг.
-#  * @return Описание локально доступных artifacts.
-#  */
 def resolve_local_model_source(source_config: DictConfig) -> EvaluationModelSource:
+    """Resolves a local model and tokenizer artifact source."""
     run_dir_value = source_config.get("run_dir", None)
     if run_dir_value is not None:
-        run_dir = resolve_existing_artifact_dir(path=run_dir_value, 
-                                                field_name="evaluation.source.run_dir")
+        run_dir = resolve_existing_artifact_dir(
+            path=run_dir_value,
+            field_name="evaluation.source.run_dir",
+        )
         model_path = resolve_existing_artifact_dir(
             path=run_dir / "model",
             field_name="evaluation.source.run_dir/model",
@@ -113,13 +90,8 @@ def resolve_local_model_source(source_config: DictConfig) -> EvaluationModelSour
     )
 
 
-# /**
-#  * Скачивает artifacts из HF Hub и возвращает локальные model/tokenizer paths.
-#  *
-#  * @param source_config Evaluation source-конфиг.
-#  * @return Описание локально доступных artifacts.
-#  */
 def resolve_hf_hub_model_source(source_config: DictConfig) -> EvaluationModelSource:
+    """Downloads artifacts from Hugging Face Hub and resolves local paths."""
     repo_id = source_config.get("repo_id", None)
     repo_path = source_config.get("repo_path", None)
     download_dir = source_config.get("download_dir", None)
@@ -160,14 +132,8 @@ def resolve_hf_hub_model_source(source_config: DictConfig) -> EvaluationModelSou
     )
 
 
-# /**
-#  * Возвращает фиксированный источник для evaluation базовой Qwen2.5-0.5B.
-#  *
-#  * Это специальный baseline-случай проекта, а не общий механизм выбора HF-моделей.
-#  *
-#  * @return Описание source с HF id модели и заметной run directory для результатов.
-#  */
 def resolve_base_qwen_model_source() -> EvaluationModelSource:
+    """Returns the fixed source for base Qwen2.5-0.5B evaluation."""
     return EvaluationModelSource(
         source_type="base_model",
         run_dir=resolve_project_path(BASE_QWEN_RUN_DIR),
@@ -176,13 +142,8 @@ def resolve_base_qwen_model_source() -> EvaluationModelSource:
     )
 
 
-# /**
-#  * Выбирает local или HF Hub источник model/tokenizer artifacts для evaluation.
-#  *
-#  * @param config Полный Hydra-конфиг или только evaluation-секция.
-#  * @return Описание локально доступных artifacts.
-#  */
 def resolve_evaluation_model_source(config: DictConfig) -> EvaluationModelSource:
+    """Selects local, Hugging Face Hub, or base model artifacts for evaluation."""
     source_config = get_evaluation_source_config(config)
     if bool(source_config.get("use_base_model", False)):
         if bool(source_config.get("use_hf_hub", False)):

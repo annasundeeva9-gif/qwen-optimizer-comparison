@@ -13,12 +13,8 @@ from omegaconf import OmegaConf
 BASE_QWEN_RUN_ID = "__base_qwen_2_5_0_5b__"
 
 
-# /**
-#  * Создает parser для сборки comparison CSV по списку run_id.
-#  *
-#  * @return Parser с позиционными run_id и путями входа/выхода.
-#  */
 def build_parser() -> argparse.ArgumentParser:
+    """Builds the CLI parser for comparison table export."""
     parser = argparse.ArgumentParser(description="Export comparison table for selected runs.")
     parser.add_argument("run_ids", nargs="+")
     parser.add_argument("--runs-dir", default="outputs/runs")
@@ -27,27 +23,16 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-# /**
-#  * Загружает JSON-файл как словарь.
-#  *
-#  * @param path Путь к JSON-файлу.
-#  * @return Словарь из JSON-файла.
-#  */
 def load_json_dict(path: Path) -> dict[str, Any]:
+    """Loads a JSON object from disk."""
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise TypeError(f"JSON file must contain an object: {path}")
     return data
 
 
-# /**
-#  * Возвращает последнее числовое значение метрики из history.
-#  *
-#  * @param history История логов Trainer из result.json.
-#  * @param metric_name Имя метрики, например eval_loss.
-#  * @return Последнее числовое значение или None.
-#  */
 def find_last_history_metric(history: object, metric_name: str) -> float | None:
+    """Finds the last numeric metric value in Trainer history."""
     if not isinstance(history, list):
         return None
 
@@ -61,14 +46,8 @@ def find_last_history_metric(history: object, metric_name: str) -> float | None:
     return last_value
 
 
-# /**
-#  * Нормализует имя harness-метрики для CSV-колонки.
-#  *
-#  * @param task Имя benchmark task.
-#  * @param metric Имя метрики из evaluation_summary.csv.
-#  * @return Имя колонки без символов, неудобных для CSV/таблиц.
-#  */
 def build_harness_column_name(task: str, metric: str) -> str:
+    """Normalizes a harness metric name for a table column."""
     normalized_metric = (
         metric.replace(",", "_")
         .replace("/", "_")
@@ -79,13 +58,8 @@ def build_harness_column_name(task: str, metric: str) -> str:
     return f"{task}_{normalized_metric}".lower()
 
 
-# /**
-#  * Загружает harness-метрики из evaluation_summary.csv одного run-а.
-#  *
-#  * @param summary_path Путь к evaluation_summary.csv.
-#  * @return Словарь CSV-колонка -> значение.
-#  */
 def load_harness_metrics(summary_path: Path) -> dict[str, str]:
+    """Loads harness metrics from one evaluation summary CSV."""
     if not summary_path.is_file():
         return {}
 
@@ -103,13 +77,8 @@ def load_harness_metrics(summary_path: Path) -> dict[str, str]:
     return metrics
 
 
-# /**
-#  * Форматирует числовую ячейку до 4 знаков после запятой.
-#  *
-#  * @param value Значение из artifacts или CSV.
-#  * @return Округленное число строкой или исходная строка для нечисловых значений.
-#  */
 def format_table_number(value: object) -> str:
+    """Formats a numeric table cell with four decimal places."""
     if isinstance(value, int | float) and not isinstance(value, bool):
         return f"{float(value):.4f}"
     if isinstance(value, str):
@@ -120,14 +89,8 @@ def format_table_number(value: object) -> str:
     return ""
 
 
-# /**
-#  * Собирает строку comparison table для evaluation базовой Qwen-модели.
-#  *
-#  * @param run_id Идентификатор baseline run-а.
-#  * @param run_dir Директория baseline run-а.
-#  * @return Строка CSV с прочерками вместо training-метрик.
-#  */
 def build_base_model_row(run_id: str, run_dir: Path) -> dict[str, str]:
+    """Builds the comparison row for the base Qwen evaluation."""
     row = {
         "run_id": run_id,
         "optimizer": "base_qwen",
@@ -139,14 +102,8 @@ def build_base_model_row(run_id: str, run_dir: Path) -> dict[str, str]:
     return row
 
 
-# /**
-#  * Собирает одну строку comparison table из run artifacts.
-#  *
-#  * @param run_id Идентификатор run-а.
-#  * @param runs_dir Директория outputs/runs.
-#  * @return Строка CSV как словарь.
-#  */
 def build_comparison_row(run_id: str, runs_dir: Path) -> dict[str, str]:
+    """Builds one comparison row from run artifacts."""
     run_dir = runs_dir / run_id
     if run_id == BASE_QWEN_RUN_ID:
         return build_base_model_row(run_id=run_id, run_dir=run_dir)
@@ -179,14 +136,8 @@ def build_comparison_row(run_id: str, runs_dir: Path) -> dict[str, str]:
     return row
 
 
-# /**
-#  * Записывает comparison rows в CSV с объединенным набором колонок.
-#  *
-#  * @param rows Строки comparison table.
-#  * @param output_path Путь к выходному CSV.
-#  * @return None.
-#  */
 def write_comparison_csv(rows: list[dict[str, str]], output_path: Path) -> None:
+    """Writes comparison rows to CSV."""
     columns = build_comparison_columns(rows)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -197,13 +148,8 @@ def write_comparison_csv(rows: list[dict[str, str]], output_path: Path) -> None:
             writer.writerow({column: row.get(column, "") for column in columns})
 
 
-# /**
-#  * Собирает порядок колонок comparison table.
-#  *
-#  * @param rows Строки comparison table.
-#  * @return Список колонок CSV/LaTeX.
-#  */
 def build_comparison_columns(rows: list[dict[str, str]]) -> list[str]:
+    """Builds the comparison table column order."""
     base_columns = ["optimizer", "lr", "train_loss", "val_loss"]
     extra_columns = sorted(
         {
@@ -216,13 +162,8 @@ def build_comparison_columns(rows: list[dict[str, str]]) -> list[str]:
     return base_columns + extra_columns
 
 
-# /**
-#  * Экранирует значение для LaTeX tabular.
-#  *
-#  * @param value Значение ячейки.
-#  * @return Экранированная строка.
-#  */
 def escape_latex(value: str) -> str:
+    """Escapes a value for LaTeX tabular output."""
     replacements = {
         "\\": r"\textbackslash{}",
         "&": r"\&",
@@ -238,14 +179,8 @@ def escape_latex(value: str) -> str:
     return "".join(replacements.get(char, char) for char in value)
 
 
-# /**
-#  * Записывает comparison rows в простой LaTeX tabular.
-#  *
-#  * @param rows Строки comparison table.
-#  * @param output_path Путь к выходному tex-файлу.
-#  * @return None.
-#  */
 def write_comparison_latex(rows: list[dict[str, str]], output_path: Path) -> None:
+    """Writes comparison rows as a simple LaTeX tabular."""
     columns = build_comparison_columns(rows)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as file:
@@ -262,13 +197,8 @@ def write_comparison_latex(rows: list[dict[str, str]], output_path: Path) -> Non
         file.write("\\end{tabular}\n")
 
 
-# /**
-#  * Точка входа CLI для сборки comparison CSV.
-#  *
-#  * @param argv CLI-аргументы или None для чтения из sys.argv.
-#  * @return None.
-#  */
 def main(argv: list[str] | None = None) -> None:
+    """Runs the comparison table export CLI."""
     args = build_parser().parse_args(argv)
     runs_dir = Path(args.runs_dir)
     rows = [build_comparison_row(run_id=run_id, runs_dir=runs_dir) for run_id in args.run_ids]

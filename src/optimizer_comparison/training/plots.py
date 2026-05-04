@@ -6,25 +6,15 @@ from pathlib import Path
 from typing import TypeGuard
 
 
-# /**
-#  * Проверяет, что значение можно использовать как числовую точку на графике.
-#  *
-#  * @param value Значение из Trainer log history.
-#  * @return True, если значение является числом, но не bool.
-#  */
 def is_plot_number(value: object) -> TypeGuard[int | float]:
+    """Checks whether a value can be plotted as a numeric point."""
     return isinstance(value, int | float) and not isinstance(value, bool)
 
 
-# /**
-#  * Собирает точки train loss, validation loss и learning rate из Trainer log history.
-#  *
-#  * @param history Список записей Trainer log_history.
-#  * @return Словарь серий, где каждая серия содержит пары step/value.
-#  */
 def collect_training_curve_series(
     history: list[object],
 ) -> dict[str, list[tuple[int, float]]]:
+    """Collects train loss, validation loss, and learning rate series."""
     series: dict[str, list[tuple[int, float]]] = {
         "train_loss": [],
         "val_loss": [],
@@ -52,27 +42,16 @@ def collect_training_curve_series(
     return series
 
 
-# /**
-#  * Возвращает true, если хотя бы одна серия содержит точки для графика.
-#  *
-#  * @param series Словарь серий training-графика.
-#  * @return True, если график имеет смысл сохранять.
-#  */
 def has_training_curve_points(series: dict[str, list[tuple[int, float]]]) -> bool:
+    """Checks whether any training curve series has points."""
     return any(points for points in series.values())
 
 
-# /**
-#  * Сохраняет один PNG-график train loss, validation loss и learning rate.
-#  *
-#  * @param history Список записей Trainer log_history.
-#  * @param output_path Путь к PNG-файлу.
-#  * @return Путь к файлу или None, если в history нет подходящих точек.
-#  */
 def save_training_curves_plot(
     history: list[object],
     output_path: str | Path,
 ) -> Path | None:
+    """Saves one PNG with train loss, validation loss, and learning rate."""
     series = collect_training_curve_series(history)
     if not has_training_curve_points(series):
         return None
@@ -112,17 +91,11 @@ def save_training_curves_plot(
     return output
 
 
-# /**
-#  * Добавляет путь training-графика в result artifacts, если график удалось построить.
-#  *
-#  * @param result Training-result с history и artifacts.
-#  * @param run_dir Директория run-а для сохранения PNG.
-#  * @return Тот же training-result с обновленной секцией artifacts.plots.
-#  */
 def add_training_curves_artifact(
     result: dict[str, object],
     run_dir: str | Path,
 ) -> dict[str, object]:
+    """Adds the training curves path to result artifacts when a plot is created."""
     history = result.get("history", [])
     if not isinstance(history, list):
         raise TypeError("Training result history must be a list.")

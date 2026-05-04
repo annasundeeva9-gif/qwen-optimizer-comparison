@@ -19,5 +19,5 @@ for run_dir in "${RUN_DIRS[@]}"; do
   fi
 
   echo "Starting evaluation grid run: ${run_dir}"
-  bash scripts/main/eval.sh "${run_dir}"
+  bash scripts/workflows/eval.sh "${run_dir}"
 done

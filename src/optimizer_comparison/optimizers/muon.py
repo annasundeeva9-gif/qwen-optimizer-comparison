@@ -34,14 +34,8 @@ def zeropower_via_newtonschulz5(matrix: torch.Tensor, steps: int) -> torch.Tenso
         x = x.T
     return cast(torch.Tensor, x)
 
-# /**
-#  * Раскрывает шаблоны имен Muon-параметров для всех слоев модели.
-#  *
-#  * @param layer_count Количество transformer layers.
-#  * @param patterns Шаблоны имен параметров с placeholder {layer}.
-#  * @return Список конкретных имен параметров для Muon.
-#  */
 def expand_muon_param_patterns(layer_count: int, patterns: list[str]) -> list[str]:
+    """Expands Muon parameter name patterns for all model layers."""
     muon_params: list[str] = []
     for layer_index in range(layer_count):
         for pattern in patterns:

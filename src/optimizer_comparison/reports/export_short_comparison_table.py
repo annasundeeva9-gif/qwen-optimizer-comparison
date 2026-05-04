@@ -14,12 +14,8 @@ BASE_QWEN_RUN_ID = "__base_qwen_2_5_0_5b__"
 PREFERRED_QUALITY_METRICS = ("acc_norm,none", "acc,none")
 
 
-# /**
-#  * Создает parser для сборки короткой comparison table.
-#  *
-#  * @return Parser с позиционными run_id и путями входа/выхода.
-#  */
 def build_parser() -> argparse.ArgumentParser:
+    """Builds the CLI parser for short comparison table export."""
     parser = argparse.ArgumentParser(description="Export short comparison table.")
     parser.add_argument("run_ids", nargs="+")
     parser.add_argument("--runs-dir", default="outputs/runs")
@@ -28,26 +24,16 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-# /**
-#  * Загружает JSON-файл как словарь.
-#  *
-#  * @param path Путь к JSON-файлу.
-#  * @return Словарь из JSON-файла.
-#  */
 def load_json_dict(path: Path) -> dict[str, Any]:
+    """Loads a JSON object from disk."""
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise TypeError(f"JSON file must contain an object: {path}")
     return data
 
 
-# /**
-#  * Форматирует числовое значение до 4 знаков после запятой.
-#  *
-#  * @param value Значение метрики или строка.
-#  * @return Округленное число строкой, прочерк или исходная строка.
-#  */
 def format_table_number(value: object) -> str:
+    """Formats a numeric table cell with four decimal places."""
     if isinstance(value, int | float) and not isinstance(value, bool):
         return f"{float(value):.4f}"
     if isinstance(value, str):
@@ -58,14 +44,8 @@ def format_table_number(value: object) -> str:
     return "-"
 
 
-# /**
-#  * Возвращает последнее числовое значение метрики из history.
-#  *
-#  * @param history История логов Trainer из result.json.
-#  * @param metric_name Имя метрики, например eval_loss.
-#  * @return Последнее числовое значение или None.
-#  */
 def find_last_history_metric(history: object, metric_name: str) -> float | None:
+    """Finds the last numeric metric value in Trainer history."""
     if not isinstance(history, list):
         return None
 
@@ -79,13 +59,8 @@ def find_last_history_metric(history: object, metric_name: str) -> float | None:
     return last_value
 
 
-# /**
-#  * Загружает строки evaluation_summary.csv.
-#  *
-#  * @param summary_path Путь к evaluation_summary.csv.
-#  * @return Список строк CSV как словарей.
-#  */
 def load_evaluation_summary_rows(summary_path: Path) -> list[dict[str, str]]:
+    """Loads rows from evaluation_summary.csv."""
     if not summary_path.is_file():
         return []
 
@@ -93,13 +68,8 @@ def load_evaluation_summary_rows(summary_path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(file))
 
 
-# /**
-#  * Считает средний harness score по той же формуле, что task metrics table.
-#  *
-#  * @param summary_rows Строки evaluation_summary.csv.
-#  * @return Среднее качество модели по задачам или None.
-#  */
 def calculate_avg_harness_score(summary_rows: list[dict[str, str]]) -> float | None:
+    """Calculates the average harness score used in report tables."""
     values_by_task: dict[str, float] = {}
     rows_by_task: dict[str, list[dict[str, str]]] = {}
     for row in summary_rows:
@@ -126,14 +96,8 @@ def calculate_avg_harness_score(summary_rows: list[dict[str, str]]) -> float | N
     return sum(values_by_task.values()) / len(values_by_task)
 
 
-# /**
-#  * Собирает строку короткой таблицы для evaluation базовой модели.
-#  *
-#  * @param run_id Идентификатор baseline run-а.
-#  * @param run_dir Директория baseline run-а.
-#  * @return Строка короткой comparison table.
-#  */
 def build_base_model_row(run_id: str, run_dir: Path) -> dict[str, str]:
+    """Builds the short comparison row for the base model evaluation."""
     avg_harness_score = calculate_avg_harness_score(
         load_evaluation_summary_rows(run_dir / "evaluation" / "evaluation_summary.csv")
     )
@@ -146,14 +110,8 @@ def build_base_model_row(run_id: str, run_dir: Path) -> dict[str, str]:
     }
 
 
-# /**
-#  * Собирает строку короткой comparison table из training/evaluation artifacts.
-#  *
-#  * @param run_id Идентификатор run-а.
-#  * @param runs_dir Директория outputs/runs.
-#  * @return Строка короткой comparison table.
-#  */
 def build_short_comparison_row(run_id: str, runs_dir: Path) -> dict[str, str]:
+    """Builds one short comparison row from run artifacts."""
     run_dir = runs_dir / run_id
     if run_id == BASE_QWEN_RUN_ID:
         return build_base_model_row(run_id=run_id, run_dir=run_dir)
@@ -185,23 +143,13 @@ def build_short_comparison_row(run_id: str, runs_dir: Path) -> dict[str, str]:
     }
 
 
-# /**
-#  * Возвращает порядок колонок короткой comparison table.
-#  *
-#  * @return Список колонок CSV/LaTeX.
-#  */
 def build_short_comparison_columns() -> list[str]:
+    """Returns the short comparison table column order."""
     return ["optimizer", "lr", "train_loss", "val_loss", "avg_harness_score"]
 
 
-# /**
-#  * Записывает короткую comparison table в CSV.
-#  *
-#  * @param rows Строки таблицы.
-#  * @param output_path Путь к выходному CSV.
-#  * @return None.
-#  */
 def write_short_comparison_csv(rows: list[dict[str, str]], output_path: Path) -> None:
+    """Writes the short comparison table to CSV."""
     columns = build_short_comparison_columns()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8", newline="") as file:
@@ -211,13 +159,8 @@ def write_short_comparison_csv(rows: list[dict[str, str]], output_path: Path) ->
             writer.writerow({column: row.get(column, "") for column in columns})
 
 
-# /**
-#  * Экранирует значение для LaTeX tabular.
-#  *
-#  * @param value Значение ячейки.
-#  * @return Экранированная строка.
-#  */
 def escape_latex(value: str) -> str:
+    """Escapes a value for LaTeX tabular output."""
     replacements = {
         "\\": r"\textbackslash{}",
         "&": r"\&",
@@ -233,14 +176,8 @@ def escape_latex(value: str) -> str:
     return "".join(replacements.get(char, char) for char in value)
 
 
-# /**
-#  * Записывает короткую comparison table в LaTeX tabular.
-#  *
-#  * @param rows Строки таблицы.
-#  * @param output_path Путь к выходному tex-файлу.
-#  * @return None.
-#  */
 def write_short_comparison_latex(rows: list[dict[str, str]], output_path: Path) -> None:
+    """Writes the short comparison table as a LaTeX tabular."""
     columns = build_short_comparison_columns()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as file:
@@ -257,13 +194,8 @@ def write_short_comparison_latex(rows: list[dict[str, str]], output_path: Path) 
         file.write("\\end{tabular}\n")
 
 
-# /**
-#  * Точка входа CLI для сборки короткой comparison table.
-#  *
-#  * @param argv CLI-аргументы или None для чтения из sys.argv.
-#  * @return None.
-#  */
 def main(argv: list[str] | None = None) -> None:
+    """Runs the short comparison table export CLI."""
     args = build_parser().parse_args(argv)
     runs_dir = Path(args.runs_dir)
     rows = [

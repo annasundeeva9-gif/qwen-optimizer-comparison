@@ -12,14 +12,8 @@ from optimizer_comparison.data.dataset_loader import (
 )
 
 
-# /**
-#  * Проверяет raw-датасет без изменения его содержимого.
-#  *
-#  * @param dataset Raw dataset с текстовой колонкой.
-#  * @param config Полная data-секция Hydra-конфига.
-#  * @return Исходный dataset, если проверки прошли успешно.
-#  */
 def simple_preprocess(dataset: Dataset, config: DictConfig) -> Dataset:
+    """Validates the raw dataset without changing its content."""
     text_column = str(config.raw.text_column)
     if text_column not in dataset.column_names:
         raise ValueError(f"Dataset does not contain text column: {text_column}")
@@ -38,14 +32,8 @@ def simple_preprocess(dataset: Dataset, config: DictConfig) -> Dataset:
     return dataset
 
 
-# /**
-#  * Загружает preprocessed dataset с диска или выполняет preprocessing raw-датасета.
-#  *
-#  * @param dataset Raw dataset, который нужно проверить или подготовить.
-#  * @param config Полная data-секция Hydra-конфига.
-#  * @return Preprocessed dataset.
-#  */
 def load_or_preprocess_dataset(dataset: Dataset, config: DictConfig) -> Dataset:
+    """Loads a preprocessed dataset or validates the raw dataset."""
     preprocessing_config = config.preprocessing
     preprocessed_dir = str(preprocessing_config.dir)
 

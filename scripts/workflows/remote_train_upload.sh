@@ -55,7 +55,7 @@ if [[ -z "${EXPERIMENT}" ]]; then
   EXPERIMENT="${OPTIMIZER}_baseline"
 fi
 
-bash scripts/main/train.sh \
+bash scripts/workflows/train.sh \
   --mode full \
   --model qwen_0_5b \
   "--optimizer=${OPTIMIZER}" \

@@ -13,12 +13,8 @@ from optimizer_comparison.artifacts.local_store import save_json
 from optimizer_comparison.tracking.mlflow_logger import log_evaluation_run
 
 
-# /**
-#  * Создает parser для повторного логирования уже готового evaluation-result в MLflow.
-#  *
-#  * @return Parser с аргументами run directory и путями evaluation artifacts.
-#  */
 def build_parser() -> argparse.ArgumentParser:
+    """Builds CLI parser for logging an existing evaluation result."""
     parser = argparse.ArgumentParser(description="Log existing evaluation result to MLflow.")
     parser.add_argument("--run-dir", required=True)
     parser.add_argument("--config-path", default=None)
@@ -27,26 +23,16 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-# /**
-#  * Загружает JSON-файл как словарь.
-#  *
-#  * @param path Путь к JSON-файлу.
-#  * @return Словарь из JSON-файла.
-#  */
 def load_json_dict(path: Path) -> dict[str, object]:
+    """Loads a JSON file as a dictionary."""
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise TypeError(f"JSON file must contain an object: {path}")
     return data
 
 
-# /**
-#  * Повторно логирует сохраненный evaluation-result в MLflow без запуска harness.
-#  *
-#  * @param argv CLI-аргументы или None для чтения из sys.argv.
-#  * @return None.
-#  */
 def main(argv: list[str] | None = None) -> None:
+    """Re-logs a saved evaluation result in MLflow without running harness."""
     args = build_parser().parse_args(argv)
     run_dir = Path(args.run_dir)
     config_path = Path(args.config_path) if args.config_path else run_dir / "config.yaml"

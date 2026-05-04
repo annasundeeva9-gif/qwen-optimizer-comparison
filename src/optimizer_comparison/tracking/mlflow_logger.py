@@ -15,36 +15,21 @@ from optimizer_comparison.training.result_contract import TrainingResult
 MLFLOW_EXPERIMENT_ID = "0"
 
 
-# /**
-#  * Проверяет, включен ли MLflow tracking в полном Hydra-конфиге.
-#  *
-#  * @param config Полная конфигурация запуска.
-#  * @return True, если tracking включен.
-#  */
 def is_tracking_enabled(config: DictConfig) -> bool:
+    """Checks whether MLflow tracking is enabled."""
     return bool(config.get("tracking", {}).get("enabled", False))
 
 
-# /**
-#  * Настраивает MLflow для текущего запуска.
-#  *
-#  * @param config Полная конфигурация запуска.
-#  * @return None.
-#  */
 def setup_mlflow(config: DictConfig) -> None:
+    """Configures MLflow for the current run."""
     tracking_config = config.tracking
     tracking_uri = resolve_project_path(str(tracking_config.tracking_uri))
 
     mlflow.set_tracking_uri(tracking_uri.as_uri())
 
 
-# /**
-#  * Готовит компактный набор параметров training-запуска для MLflow.
-#  *
-#  * @param config Полная конфигурация запуска.
-#  * @return Словарь параметров, пригодных для MLflow log_params.
-#  */
 def collect_training_params(config: DictConfig) -> dict[str, str]:
+    """Builds the compact training parameter set for MLflow."""
     params = {
         "project.name": config.get("project", {}).get("name"),
         "mode.name": config.get("mode", {}).get("name"),
@@ -75,23 +60,13 @@ def collect_training_params(config: DictConfig) -> dict[str, str]:
     return {key: str(value) for key, value in params.items() if value is not None}
 
 
-# /**
-#  * Логирует параметры training-запуска в текущий MLflow run.
-#  *
-#  * @param config Полная конфигурация запуска.
-#  * @return None.
-#  */
 def log_run_config(config: DictConfig) -> None:
+    """Logs training run parameters into the active MLflow run."""
     mlflow.log_params(collect_training_params(config))
 
 
-# /**
-#  * Логирует минимальные training-метрики в текущий MLflow run.
-#  *
-#  * @param training_result Training-result с секцией metrics.
-#  * @return None.
-#  */
 def log_training_metrics(training_result: TrainingResult) -> None:
+    """Logs top-level training metrics into the active MLflow run."""
     metrics = training_result.get("metrics", {})
     if not isinstance(metrics, dict):
         raise TypeError("Training result metrics must be a dictionary.")
@@ -101,13 +76,8 @@ def log_training_metrics(training_result: TrainingResult) -> None:
             mlflow.log_metric(f"train/{metric_name}", float(metric_value))
 
 
-# /**
-#  * Логирует историю training/eval метрик по шагам.
-#  *
-#  * @param training_result Training-result с top-level секцией history.
-#  * @return None.
-#  */
 def log_training_history(training_result: TrainingResult) -> None:
+    """Logs step-wise training and evaluation metrics."""
     history = training_result.get("history", [])
     if not isinstance(history, list):
         raise TypeError("Training result history must be a list.")
@@ -130,13 +100,8 @@ def log_training_history(training_result: TrainingResult) -> None:
                 mlflow.log_metric(mlflow_name, float(value), step=step)
 
 
-# /**
-#  * Логирует ссылки на Hugging Face Hub artifacts в MLflow tags.
-#  *
-#  * @param training_result Training-result с artifacts.hf_hub metadata.
-#  * @return None.
-#  */
 def log_hf_hub_tags(training_result: TrainingResult) -> None:
+    """Logs Hugging Face Hub artifact links into MLflow tags."""
     artifacts = training_result.get("artifacts", {})
     if not isinstance(artifacts, dict):
         raise TypeError("Training result artifacts must be a dictionary.")
@@ -154,14 +119,8 @@ def log_hf_hub_tags(training_result: TrainingResult) -> None:
         mlflow.set_tags(tags)
 
 
-# /**
-#  * Логирует локальные артефакты training-запуска в текущий MLflow run.
-#  *
-#  * @param config Полная конфигурация запуска.
-#  * @param training_result Training-result с путями к локальным артефактам.
-#  * @return None.
-#  */
 def log_custom_artifacts(config: DictConfig, artifact_paths: list[str]) -> None:
+    """Logs selected local artifact files into MLflow."""
     if not bool(config.get("tracking", {}).get("log_artifacts", False)):
         return
 
@@ -171,14 +130,8 @@ def log_custom_artifacts(config: DictConfig, artifact_paths: list[str]) -> None:
             mlflow.log_artifact(str(path))
 
 
-# /**
-#  * Логирует компактные training plot artifacts в MLflow.
-#  *
-#  * @param config Полная конфигурация запуска.
-#  * @param training_result Training-result с artifacts.plots.
-#  * @return None.
-#  */
 def log_training_artifacts(config: DictConfig, training_result: TrainingResult) -> None:
+    """Logs compact training plot artifacts into MLflow."""
     artifacts = training_result.get("artifacts", {})
     if not isinstance(artifacts, dict):
         raise TypeError("Training result artifacts must be a dictionary.")
@@ -195,14 +148,8 @@ def log_training_artifacts(config: DictConfig, training_result: TrainingResult) 
     log_custom_artifacts(config=config, artifact_paths=plot_paths)
 
 
-# /**
-#  * Логирует полный training run в MLflow, если tracking включен.
-#  *
-#  * @param config Полная конфигурация запуска.
-#  * @param training_result Training-result с метриками и путями к артефактам.
-#  * @return None.
-#  */
 def log_training_run(config: DictConfig, training_result: TrainingResult) -> str | None:
+    """Logs the full training run to MLflow when tracking is enabled."""
     if not is_tracking_enabled(config):
         return None
 
@@ -226,14 +173,8 @@ def log_training_run(config: DictConfig, training_result: TrainingResult) -> str
         return str(active_run.info.run_id)
 
 
-# /**
-#  * Дописывает HF Hub metadata в уже созданный MLflow training run.
-#  *
-#  * @param config Полная конфигурация запуска.
-#  * @param training_result Training-result с mlflow_run_id и HF Hub metadata.
-#  * @return None.
-#  */
 def update_training_run_hf_tags(config: DictConfig, training_result: TrainingResult) -> None:
+    """Appends Hugging Face Hub metadata to an existing MLflow training run."""
     if not is_tracking_enabled(config):
         return
 
@@ -246,13 +187,8 @@ def update_training_run_hf_tags(config: DictConfig, training_result: TrainingRes
         log_hf_hub_tags(training_result)
 
 
-# /**
-#  * Логирует расширенные evaluation-метрики в текущий MLflow run.
-#  *
-#  * @param evaluation_result Evaluation-result будущего evaluation-пайплайна.
-#  * @return None.
-#  */
 def log_evaluation_metrics(parsed_lm_eval_result: dict[str, Any]) -> None:
+    """Logs parsed lm-evaluation-harness metrics into MLflow."""
     metrics = parsed_lm_eval_result.get("metrics", {})
     if not isinstance(metrics, dict):
         raise TypeError("Parsed lm-evaluation-harness metrics must be a dictionary.")
@@ -262,13 +198,8 @@ def log_evaluation_metrics(parsed_lm_eval_result: dict[str, Any]) -> None:
             mlflow.log_metric(str(metric_name), float(metric_value))
 
 
-# /**
-#  * Логирует артефакты evaluation-запуска в текущий MLflow run.
-#  *
-#  * @param evaluation_result Evaluation-result будущего evaluation-пайплайна.
-#  * @return None.
-#  */
 def log_evaluation_tags(evaluation_result: dict[str, Any]) -> None:
+    """Logs evaluation metadata into MLflow tags."""
     tags = {
         "evaluation.status": str(evaluation_result.get("status", "unknown")),
         "evaluation.result_path": str(evaluation_result.get("lm_eval_result_path", "")),
@@ -290,13 +221,8 @@ def log_evaluation_tags(evaluation_result: dict[str, Any]) -> None:
     mlflow.set_tags(tags)
 
 
-# /**
-#  * Логирует CSV summary evaluation run-а как MLflow artifact.
-#  *
-#  * @param evaluation_result Evaluation-result с путем summary_path.
-#  * @return None.
-#  */
 def log_evaluation_artifacts(evaluation_result: dict[str, Any]) -> None:
+    """Logs the evaluation summary CSV as an MLflow artifact."""
     summary_path = evaluation_result.get("summary_path", None)
     if summary_path is None:
         return
@@ -306,14 +232,8 @@ def log_evaluation_artifacts(evaluation_result: dict[str, Any]) -> None:
         mlflow.log_artifact(str(path))
 
 
-# /**
-#  * Логирует полный evaluation run в MLflow.
-#  *
-#  * @param config Полная конфигурация запуска.
-#  * @param evaluation_result Evaluation-result будущего evaluation-пайплайна.
-#  * @return MLflow run id или None, если tracking выключен.
-#  */
 def log_evaluation_run(config: DictConfig, evaluation_result: dict[str, Any]) -> str | None:
+    """Logs the full evaluation run to MLflow."""
     if not is_tracking_enabled(config):
         return None
 

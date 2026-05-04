@@ -10,54 +10,31 @@ from typing import Any
 from omegaconf import DictConfig, OmegaConf
 
 
-# /**
-#  * Возвращает корневую директорию проекта.
-#  *
-#  * @return Абсолютный путь к корню репозитория.
-#  */
 def get_project_root() -> Path:
+    """Returns the project root directory."""
     return Path(__file__).resolve().parents[3]
 
 
-# /**
-#  * Преобразует путь относительно проекта в абсолютный путь.
-#  *
-#  * @param path Абсолютный путь или путь относительно корня проекта.
-#  * @return Абсолютный путь.
-#  */
 def resolve_project_path(path: str | Path) -> Path:
+    """Resolves a project-relative path to an absolute path."""
     candidate = Path(path)
     if candidate.is_absolute():
         return candidate
     return get_project_root() / candidate
 
 
-# /**
-#  * Собирает человекочитаемый id запуска из имени эксперимента и timestamp-а.
-#  *
-#  * @param experiment_name Имя эксперимента из Hydra-конфига.
-#  * @param timestamp Timestamp запуска.
-#  * @return Run id для локальных и удаленных artifacts.
-#  */
 def build_run_id(experiment_name: str, timestamp: str) -> str:
+    """Builds a readable run id from experiment name and timestamp."""
     return f"{experiment_name}__{timestamp}"
 
 
-# /**
-#  * Создает локальную директорию конкретного запуска.
-#  *
-#  * @param artifacts_root_dir Базовая директория локальных артефактов из Hydra-конфига.
-#  * @param experiment_name Имя эксперимента из Hydra-конфига.
-#  * @param timestamp Опциональный timestamp для тестов и воспроизводимых путей.
-#  * @param run_id Опциональный готовый run id для восстановления существующего запуска.
-#  * @return Абсолютный путь к созданной директории запуска.
-#  */
 def create_run_dir(
     artifacts_root_dir: str | Path,
     experiment_name: str,
     timestamp: str | None = None,
     run_id: str | None = None,
 ) -> Path:
+    """Creates the local directory for one run."""
     run_timestamp = timestamp or datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     resolved_run_id = run_id or build_run_id(
         experiment_name=experiment_name,
@@ -68,33 +45,20 @@ def create_run_dir(
     return run_dir
 
 
-# /**
-#  * Сохраняет полностью resolved Hydra-конфиг в директорию запуска.
-#  *
-#  * @param config Полная конфигурация запуска.
-#  * @param run_dir Директория конкретного запуска.
-#  * @param filename Имя YAML-файла для сохранения конфига.
-#  * @return Путь к сохраненному YAML-файлу.
-#  */
 def save_resolved_config(
     config: DictConfig,
     run_dir: str | Path,
     filename: str = "config.yaml",
 ) -> Path:
+    """Saves the fully resolved Hydra config into the run directory."""
     output_path = Path(run_dir) / filename
     output_path.parent.mkdir(parents=True, exist_ok=True)
     OmegaConf.save(config=config, f=output_path, resolve=True)
     return output_path
 
 
-# /**
-#  * Сохраняет словарь в JSON-файл внутри локального хранилища артефактов.
-#  *
-#  * @param data Данные для сохранения.
-#  * @param output_path Путь к JSON-файлу.
-#  * @return Путь к сохраненному JSON-файлу.
-#  */
 def save_json(data: dict[str, Any], output_path: str | Path) -> Path:
+    """Saves a dictionary as JSON in the local artifact store."""
     path = Path(output_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(

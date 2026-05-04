@@ -1,4 +1,4 @@
-﻿"""Entrypoint for training runs."""
+"""Entrypoint for training runs."""
 
 from __future__ import annotations
 
@@ -27,19 +27,12 @@ from optimizer_comparison.training.result_contract import set_local_artifact_pat
 from optimizer_comparison.training.training_loop import run_training
 
 
-# /**
-#  * Возвращает директорию run-а для нового training или resume существующего run-а.
-#  *
-#  * @param config Полная конфигурация запуска.
-#  * @param artifacts_root_dir Корневая директория локальных run artifacts.
-#  * @param experiment_name Имя эксперимента для нового run-а.
-#  * @return Директория run-а.
-#  */
 def resolve_training_run_dir(
     config: DictConfig,
     artifacts_root_dir: str,
     experiment_name: str,
 ) -> Path:
+    """Returns the run directory for a new or resumed training run."""
     resume_from_run_dir = config.training.get("resume_from_run_dir", None)
     if resume_from_run_dir is None:
         return create_run_dir(
@@ -53,14 +46,9 @@ def resolve_training_run_dir(
     return run_dir
 
 
-# /**
-#  * Запускает training-пайплайн с конфигурацией Hydra.
-#  *
-#  * @param config Полная конфигурация запуска, собранная Hydra.
-#  * @return None. Результаты сохраняются в локальную директорию запуска.
-#  */
 @hydra.main(version_base=None, config_path="../../configs", config_name="config")
 def main(config: DictConfig) -> None:
+    """Runs the training pipeline from a Hydra config."""
     validate_hf_hub_before_training(config)
 
     experiment_name = str(config.experiment.name)

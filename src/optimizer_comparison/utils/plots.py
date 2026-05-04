@@ -3,12 +3,6 @@
 from __future__ import annotations
 
 
-# /**
-#  * Заглушка будущего сохранения кастомных графиков для evaluation/reporting.
-#  *
-#  * Основной train-пайплайн от этого модуля не зависит.
-#  *
-#  * @return None.
-#  */
 def save_training_plots() -> None:
+    """Placeholder for custom report plots that are not used by the pipeline."""
     raise NotImplementedError("Report plotting placeholder is not used by the training pipeline.")

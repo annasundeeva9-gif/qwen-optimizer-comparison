@@ -16,26 +16,15 @@ from optimizer_comparison.data.tokenization import load_or_tokenize_splits
 from optimizer_comparison.models.tokenization import build_tokenizer
 
 
-# /**
-#  * Возвращает количество строк в Dataset или DatasetDict.
-#  *
-#  * @param dataset Dataset или DatasetDict.
-#  * @return Количество строк по каждому split-у или для одного dataset.
-#  */
 def collect_dataset_sizes(dataset: Dataset | DatasetDict) -> int | dict[str, int]:
+    """Collects row counts for a Dataset or DatasetDict."""
     if isinstance(dataset, DatasetDict):
         return {split_name: len(split_dataset) for split_name, split_dataset in dataset.items()}
     return len(dataset)
 
 
-# /**
-#  * Ограничивает raw dataset для smoke-режима, если лимит задан в mode-конфиге.
-#  *
-#  * @param dataset Raw Dataset до preprocessing и split.
-#  * @param config Полный Hydra-конфиг проекта с mode-секцией.
-#  * @return Исходный Dataset или его первый поднабор заданного размера.
-#  */
 def apply_smoke_sample_limit(dataset: Dataset, config: DictConfig) -> Dataset:
+    """Limits the raw dataset for smoke mode when a limit is configured."""
     mode_config = config.get("mode", {})
     smoke_samples_limit = mode_config.get("smoke_samples_limit", None)
     if smoke_samples_limit is None:
@@ -48,13 +37,8 @@ def apply_smoke_sample_limit(dataset: Dataset, config: DictConfig) -> Dataset:
     return dataset.select(range(min(limit, len(dataset))))
 
 
-# /**
-#  * Запускает полный data pipeline в фиксированном порядке.
-#  *
-#  * @param config Полный Hydra-конфиг проекта.
-#  * @return Metadata с путями и размерами промежуточных представлений датасета.
-#  */
 def run_data_pipeline(config: DictConfig) -> dict[str, Any]:
+    """Runs the full data pipeline in a fixed order."""
     data_config = config.data
 
     raw_dataset = load_or_download_raw_dataset(data_config)
@@ -94,14 +78,9 @@ def run_data_pipeline(config: DictConfig) -> dict[str, Any]:
     }
 
 
-# /**
-#  * Запускает подготовку данных через Hydra.
-#  *
-#  * @param config Полный Hydra-конфиг проекта.
-#  * @return None.
-#  */
 @hydra.main(version_base=None, config_path="../../../configs", config_name="config")
 def main(config: DictConfig) -> None:
+    """Runs data preparation through Hydra."""
     run_data_pipeline(config)
 
 

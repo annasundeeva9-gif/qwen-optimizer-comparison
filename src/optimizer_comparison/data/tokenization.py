@@ -15,27 +15,15 @@ from optimizer_comparison.data.dataset_loader import (
 )
 
 
-# /**
-#  * Преобразует булевый флаг multiprocessing в значение num_proc для Dataset.map.
-#  *
-#  * @param enabled True, если нужно включить параллельную токенизацию.
-#  * @return Количество процессов или None для однопроцессного режима.
-#  */
 def resolve_num_proc(enabled: bool) -> int | None:
+    """Converts the multiprocessing flag into a Dataset.map num_proc value."""
     if not enabled:
         return None
     return max(1, (os.cpu_count() or 1) - 1)
 
 
-# /**
-#  * Токенизирует один split датасета без добавления специальных токенов.
-#  *
-#  * @param dataset Dataset с raw-текстами.
-#  * @param tokenizer Токенизатор HuggingFace или совместимый тестовый stub.
-#  * @param config Полная data-секция Hydra-конфига.
-#  * @return Dataset с токенизированными полями без исходной текстовой колонки.
-#  */
 def tokenize_dataset(dataset: Dataset, tokenizer: Any, config: DictConfig) -> Dataset:
+    """Tokenizes one dataset split without adding special tokens."""
     tokenization_config = config.tokenization
     text_column = str(config.raw.text_column)
     if text_column not in dataset.column_names:
@@ -68,14 +56,8 @@ def tokenize_dataset(dataset: Dataset, tokenizer: Any, config: DictConfig) -> Da
     return tokenized_dataset
 
 
-# /**
-#  * Проверяет, что все примеры имеют минимально допустимую длину в токенах.
-#  *
-#  * @param dataset Токенизированный Dataset с колонкой input_ids.
-#  * @param min_length_tokens Минимальная допустимая длина input_ids.
-#  * @return None.
-#  */
 def validate_min_token_length(dataset: Dataset, min_length_tokens: int) -> None:
+    """Checks that every example has the minimum allowed token length."""
     if "input_ids" not in dataset.column_names:
         raise ValueError("Tokenized dataset does not contain input_ids.")
 
@@ -90,15 +72,8 @@ def validate_min_token_length(dataset: Dataset, min_length_tokens: int) -> None:
         )
 
 
-# /**
-#  * Токенизирует train и validation split-ы независимо друг от друга.
-#  *
-#  * @param splits DatasetDict с ключами train и validation.
-#  * @param tokenizer Токенизатор HuggingFace или совместимый тестовый stub.
-#  * @param config Полная data-секция Hydra-конфига.
-#  * @return DatasetDict с токенизированными train и validation.
-#  */
 def tokenize_splits(splits: DatasetDict, tokenizer: Any, config: DictConfig) -> DatasetDict:
+    """Tokenizes train and validation splits independently."""
     return DatasetDict(
         {
             "train": tokenize_dataset(splits["train"], tokenizer, config),
@@ -107,15 +82,8 @@ def tokenize_splits(splits: DatasetDict, tokenizer: Any, config: DictConfig) -> 
     )
 
 
-# /**
-#  * Загружает tokenized split с диска или токенизирует raw split.
-#  *
-#  * @param splits DatasetDict с raw train и validation.
-#  * @param tokenizer Токенизатор HuggingFace или совместимый тестовый stub.
-#  * @param config Полная data-секция Hydra-конфига.
-#  * @return DatasetDict с токенизированными split-ами.
-#  */
 def load_or_tokenize_splits(splits: DatasetDict, tokenizer: Any, config: DictConfig) -> DatasetDict:
+    """Loads tokenized splits or tokenizes raw splits."""
     tokenized_dir = str(config.tokenization.dir)
 
     if dataset_local_path_exists(tokenized_dir) and not bool(config.tokenization.force_reload):
