@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import mlflow
+from mlflow.exceptions import MlflowException
 from omegaconf import DictConfig
 
 from optimizer_comparison.artifacts.local_store import resolve_project_path
@@ -332,8 +333,18 @@ def log_evaluation_run(config: DictConfig, evaluation_result: dict[str, Any]) ->
             log_evaluation_artifacts(evaluation_result)
             return str(active_run.info.run_id)
 
-    with mlflow.start_run(run_id=str(mlflow_run_id)):
-        log_evaluation_metrics(parsed_lm_eval_result)
-        log_evaluation_tags(evaluation_result)
-        log_evaluation_artifacts(evaluation_result)
-        return str(mlflow_run_id)
+    try:
+        with mlflow.start_run(run_id=str(mlflow_run_id)):
+            log_evaluation_metrics(parsed_lm_eval_result)
+            log_evaluation_tags(evaluation_result)
+            log_evaluation_artifacts(evaluation_result)
+            return str(mlflow_run_id)
+    except MlflowException:
+        run_name = str(evaluation_result.get("run_name", "evaluation"))
+        with mlflow.start_run(experiment_id=MLFLOW_EXPERIMENT_ID, run_name=run_name) as active_run:
+            mlflow.set_tag("evaluation.original_mlflow_run_id", str(mlflow_run_id))
+            mlflow.set_tag("evaluation.mlflow_fallback", "missing_training_run")
+            log_evaluation_metrics(parsed_lm_eval_result)
+            log_evaluation_tags(evaluation_result)
+            log_evaluation_artifacts(evaluation_result)
+            return str(active_run.info.run_id)

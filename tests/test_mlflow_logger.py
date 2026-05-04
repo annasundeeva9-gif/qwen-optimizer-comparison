@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+from mlflow.exceptions import MlflowException
 from omegaconf import OmegaConf
 
 from optimizer_comparison.evaluation.model_source import BASE_QWEN_MODEL_ID, BASE_QWEN_RUN_NAME
@@ -318,6 +319,102 @@ def test_log_evaluation_run_logs_metrics_to_existing_run(monkeypatch, tmp_path: 
 #  * @param tmp_path Временная директория pytest.
 #  * @return None.
 #  */
+# /**
+#  * Проверяет fallback на отдельный evaluation run, если training MLflow run отсутствует.
+#  *
+#  * @param monkeypatch Инструмент pytest для подмены MLflow API.
+#  * @param tmp_path Временная директория pytest.
+#  * @return None.
+#  */
+def test_log_evaluation_run_creates_fallback_run_when_training_run_missing(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    lm_eval_result_path = tmp_path / "lm_eval_results.json"
+    lm_eval_result_path.write_text(
+        json.dumps({"results": {"piqa": {"acc,none": 0.75}}}),
+        encoding="utf-8",
+    )
+    started_runs: list[dict[str, str | None]] = []
+    logged_tags: list[tuple[str, str] | dict[str, str]] = []
+
+    class FakeRun:
+        def __init__(self) -> None:
+            self.info = type("Info", (), {"run_id": "fallback-run-id"})()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+    def fake_start_run(
+        run_id: str | None = None,
+        experiment_id: str | None = None,
+        run_name: str | None = None,
+    ):
+        started_runs.append(
+            {"run_id": run_id, "experiment_id": experiment_id, "run_name": run_name}
+        )
+        if run_id is not None:
+            raise MlflowException("missing run")
+        return FakeRun()
+
+    monkeypatch.setattr(
+        "optimizer_comparison.tracking.mlflow_logger.mlflow.set_tracking_uri",
+        lambda uri: None,
+    )
+    monkeypatch.setattr(
+        "optimizer_comparison.tracking.mlflow_logger.mlflow.start_run",
+        fake_start_run,
+    )
+    monkeypatch.setattr(
+        "optimizer_comparison.tracking.mlflow_logger.mlflow.log_metric",
+        lambda name, value: None,
+    )
+    monkeypatch.setattr(
+        "optimizer_comparison.tracking.mlflow_logger.mlflow.set_tag",
+        lambda key, value: logged_tags.append((key, value)),
+    )
+    monkeypatch.setattr(
+        "optimizer_comparison.tracking.mlflow_logger.mlflow.set_tags",
+        lambda tags: logged_tags.append(tags),
+    )
+
+    mlflow_run_id = log_evaluation_run(
+        config=OmegaConf.create(
+            {
+                "tracking": {
+                    "enabled": True,
+                    "tracking_uri": str(tmp_path / "mlruns"),
+                }
+            }
+        ),
+        evaluation_result={
+            "status": "completed",
+            "run_name": "muon_qwen_500_steps",
+            "mlflow_run_id": "missing-training-run-id",
+            "lm_eval_result_path": str(lm_eval_result_path),
+        },
+    )
+
+    assert mlflow_run_id == "fallback-run-id"
+    assert started_runs == [
+        {
+            "run_id": "missing-training-run-id",
+            "experiment_id": None,
+            "run_name": None,
+        },
+        {
+            "run_id": None,
+            "experiment_id": MLFLOW_EXPERIMENT_ID,
+            "run_name": "muon_qwen_500_steps",
+        },
+    ]
+    assert ("evaluation.original_mlflow_run_id", "missing-training-run-id") in logged_tags
+    assert ("evaluation.mlflow_fallback", "missing_training_run") in logged_tags
+
+
 def test_log_evaluation_run_creates_run_for_base_model(monkeypatch, tmp_path: Path) -> None:
     lm_eval_result_path = tmp_path / "lm_eval_results.json"
     lm_eval_result_path.write_text(

@@ -13,6 +13,7 @@ from optimizer_comparison.artifacts.hf_hub import (
     download_file_from_hf,
     merge_mlflow_snapshot_archive,
     persist_training_artifacts_to_hf,
+    update_mlflow_experiment_artifact_locations,
     upload_mlflow_snapshot_to_hf,
     upload_path_to_hf,
     validate_hf_hub_before_training,
@@ -463,6 +464,45 @@ def test_merge_mlflow_snapshot_archive_preserves_local_runs(tmp_path: Path) -> N
     assert (
         tmp_path / "outputs" / "mlruns" / "1" / "remote_run" / "metrics" / "loss"
     ).read_text(encoding="utf-8") == "1 0.4 1\n"
+
+
+# /**
+#  * Проверяет upload MLflow snapshot-а через общий HF upload helper.
+#  *
+#  * @param monkeypatch Инструмент pytest для подмены upload.
+#  * @param tmp_path Временная директория pytest.
+#  * @return None.
+#  */
+# /**
+#  * Проверяет исправление artifact_location после merge MLflow snapshot-а.
+#  *
+#  * @param tmp_path Временная директория pytest.
+#  * @return None.
+#  */
+def test_update_mlflow_experiment_artifact_locations_uses_local_paths(
+    tmp_path: Path,
+) -> None:
+    mlruns_dir = tmp_path / "outputs" / "mlruns"
+    experiment_dir = mlruns_dir / "0"
+    experiment_dir.mkdir(parents=True)
+    meta_path = experiment_dir / "meta.yaml"
+    meta_path.write_text(
+        "\n".join(
+            [
+                "artifact_location: file:///root/work/project/outputs/mlruns/0",
+                "experiment_id: '0'",
+                "name: Default",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    update_mlflow_experiment_artifact_locations(mlruns_dir)
+
+    assert f"artifact_location: {experiment_dir.resolve().as_uri()}" in meta_path.read_text(
+        encoding="utf-8"
+    )
 
 
 # /**

@@ -247,26 +247,6 @@ def build_muon_trainer(
 
 
 # /**
-#  * Создает combined AdamW/Muon trainer, когда этот режим будет добавлен.
-#  *
-#  * @param config Полный Hydra-конфиг запуска.
-#  * @param model Загруженная causal language model.
-#  * @param tokenizer Загруженный tokenizer.
-#  * @param dataset Final DatasetDict с train и validation split-ами.
-#  * @param run_dir Директория конкретного запуска.
-#  * @return HuggingFace Trainer с combined optimizer path.
-#  */
-def build_combined_trainer(
-    config: DictConfig,
-    model: Any,
-    tokenizer: Any,
-    dataset: DatasetDict,
-    run_dir: str | Path,
-) -> Trainer:
-    raise NotImplementedError("Combined trainer is pending manual integration.")
-
-
-# /**
 #  * Выбирает trainer path по единственному пользовательскому переключателю optimizer.name.
 #  *
 #  * @param config Полный Hydra-конфиг запуска.
@@ -294,14 +274,6 @@ def build_trainer(
         )
     if optimizer_name == "muon":
         return build_muon_trainer(
-            config=config,
-            model=model,
-            tokenizer=tokenizer,
-            dataset=dataset,
-            run_dir=run_dir,
-        )
-    if optimizer_name == "combined":
-        return build_combined_trainer(
             config=config,
             model=model,
             tokenizer=tokenizer,

@@ -62,19 +62,6 @@ def test_training_configs_contain_shared_protocol_without_trainer_switch() -> No
 
 
 # /**
-#  * Проверяет placeholder config для будущего combined optimizer path.
-#  *
-#  * @return None.
-#  */
-def test_combined_optimizer_config_is_pending_manual_integration() -> None:
-    root = Path(__file__).resolve().parents[1]
-    config = OmegaConf.load(root / "configs" / "optimizer" / "combined.yaml")
-
-    assert config.name == "combined"
-    assert config.implementation == "pending_manual_integration"
-
-
-# /**
 #  * Проверяет smoke experiment config для Muon.
 #  *
 #  * @return None.

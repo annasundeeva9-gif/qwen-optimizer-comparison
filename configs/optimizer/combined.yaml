@@ -1,5 +1,0 @@
-name: combined
-implementation: pending_manual_integration
-lr: null
-weight_decay: null
-notes: "Combined AdamW/Muon optimizer path is added after the baseline optimizers are stable."

@@ -187,6 +187,40 @@ def merge_directory_contents(source_dir: str | Path, target_dir: str | Path) -> 
 
 
 # /**
+#  * Обновляет artifact_location у локальных MLflow experiments после переноса file store.
+#  *
+#  * MLflow file store хранит абсолютный URI в meta.yaml. После скачивания snapshot-а с
+#  * удаленной Linux-машины этот URI может указывать на /root/work/... и ломать локальное
+#  * логирование artifacts на Windows.
+#  *
+#  * @param mlruns_dir Локальная директория MLflow file store.
+#  * @return None.
+#  */
+def update_mlflow_experiment_artifact_locations(mlruns_dir: str | Path) -> None:
+    root = Path(mlruns_dir)
+    if not root.is_dir():
+        return
+
+    for experiment_dir in root.iterdir():
+        if not experiment_dir.is_dir() or not experiment_dir.name.isdigit():
+            continue
+
+        meta_path = experiment_dir / "meta.yaml"
+        if not meta_path.is_file():
+            continue
+
+        lines = meta_path.read_text(encoding="utf-8").splitlines()
+        artifact_uri = experiment_dir.resolve().as_uri()
+        updated_lines = [
+            f"artifact_location: {artifact_uri}"
+            if line.startswith("artifact_location:")
+            else line
+            for line in lines
+        ]
+        meta_path.write_text("\n".join(updated_lines) + "\n", encoding="utf-8")
+
+
+# /**
 #  * Распаковывает zip snapshot MLflow и сливает его с локальным file store.
 #  *
 #  * Snapshot должен содержать верхнеуровневую директорию mlruns, как архивы,
@@ -222,6 +256,7 @@ def merge_mlflow_snapshot_archive(
 
     target_path = Path(target_mlruns_dir)
     merge_directory_contents(source_dir=extracted_mlruns, target_dir=target_path)
+    update_mlflow_experiment_artifact_locations(target_path)
     return target_path
 
 
