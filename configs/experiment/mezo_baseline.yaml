@@ -1,0 +1,6 @@
+name: mezo_baseline
+description: "Full run with Qwen2.5-0.5B and MeZO."
+tags:
+  stage: full
+  optimizer: mezo
+  model: qwen_0_5b

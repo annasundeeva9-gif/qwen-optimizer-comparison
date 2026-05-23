@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
-import contextlib
-import functools
 from typing import Any
 
 from omegaconf import DictConfig
 import torch
-from torch.optim import Optimizer
+from accelerate import skip_first_batches
 from transformers import Trainer
-from transformers.convert_slow_tokenizers_checkpoints_to_fast import args
+from transformers.utils import is_torch_xla_available, logging
+
+from optimizer_comparison.optimizers.mezo import MeZO
+
+if is_torch_xla_available():
+    import torch_xla.core.xla_model as xm
+
+logger = logging.get_logger(__name__)
 
 class MeZOTrainer(Trainer):
     """Trainer that creates the MeZO optimizer from Hydra config."""
@@ -19,6 +24,7 @@ class MeZOTrainer(Trainer):
         """Stores optimizer config for MeZO creation."""
         super().__init__(**kwargs)
         self.optimizer_config = optimizer_config
+        self.mezo_pseudo_optimizer = MeZO(args=optimizer_config)
 
     def _run_epoch(
         self,
@@ -35,6 +41,9 @@ class MeZOTrainer(Trainer):
         steps_trained_in_current_epoch,
     ):
         """Run one full pass over the dataloader."""
+
+        assert self.args.gradient_accumulation_steps == 1
+        
         step = -1
         grad_norm = None
         learning_rate = None
@@ -91,7 +100,7 @@ class MeZOTrainer(Trainer):
                     self.control = self.callback_handler.on_step_begin(self.args, self.state, self.control)
                 
                 # MeZO added: estimate gradient
-                tr_loss_step = self.zo_step(model, inputs)
+                tr_loss_step = self.mezo_pseudo_optimizer.zo_step(model, inputs, self._mezo_forward_loss)
 
                 if (
                     self.args.logging_nan_inf_filter
@@ -112,15 +121,26 @@ class MeZOTrainer(Trainer):
 
                 if do_sync_step:
                     # MeZO added: update model with the estimated gradient
-                    self.zo_update(model)
+                    learning_rate = self._get_learning_rate()
+                    self.mezo_pseudo_optimizer.zo_update(learning_rate=learning_rate)
+                    self.lr_scheduler.step()
                     
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
-                    self.control = self.callback_handler.on_step_end(args, self.state, self.control)
+                    self.control = self.callback_handler.on_step_end(self.args, self.state, self.control)
 
-                    self._maybe_log_save_evaluate(tr_loss, model, trial, epoch, ignore_keys_for_eval)
+                    self._maybe_log_save_evaluate(
+                        self._tr_loss,
+                        grad_norm,
+                        model,
+                        trial,
+                        epoch,
+                        ignore_keys_for_eval,
+                        start_time,
+                        learning_rate=learning_rate,
+                    )
                 else:
-                    self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
+                    self.control = self.callback_handler.on_substep_end(self.args, self.state, self.control)
                 if self.control.should_epoch_stop or self.control.should_training_stop:
                     break
             if self.control.should_epoch_stop or self.control.should_training_stop:
@@ -150,3 +170,16 @@ class MeZOTrainer(Trainer):
             start_time,
             learning_rate=learning_rate,
         )
+
+    def _mezo_forward_loss(self, model, inputs):
+        """Computes a no-grad Trainer loss for one MeZO function evaluation."""
+        model.eval()
+
+        with torch.inference_mode():
+            inputs = self._prepare_inputs(inputs)
+            with self.compute_loss_context_manager():
+                loss = self.compute_loss(model, inputs)
+            if self.args.n_gpu > 1:
+                # Warning: this is copied from the original Huggingface Trainer. Untested.
+                loss = loss.mean()  # mean() to average on multi-gpu parallel training
+        return loss.detach()

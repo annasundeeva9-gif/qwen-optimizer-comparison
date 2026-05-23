@@ -1,0 +1,6 @@
+name: smoke_mezo_tiny
+description: "Smoke run with tiny Qwen2.5 model and MeZO."
+tags:
+  stage: smoke
+  optimizer: mezo
+  model: tiny_qwen_2_5

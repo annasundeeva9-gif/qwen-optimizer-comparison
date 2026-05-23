@@ -1,0 +1,6 @@
+name: mezo
+implementation: custom
+lr: 1e-6
+weight_decay: 0
+zo_eps: 1e-3
+non_diff: false

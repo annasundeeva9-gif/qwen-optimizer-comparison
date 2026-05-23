@@ -20,6 +20,7 @@ from optimizer_comparison.data.dataset_loader import (
 from optimizer_comparison.data.prepare_data import run_data_pipeline
 from optimizer_comparison.models.build_model import build_model
 from optimizer_comparison.models.tokenization import build_tokenizer
+from optimizer_comparison.training.mezo_trainer import MeZOTrainer
 from optimizer_comparison.training.muon_trainer import MuonTrainer
 from optimizer_comparison.training.result_contract import TrainingResult, build_training_result
 from optimizer_comparison.training.seed import set_seed
@@ -99,18 +100,10 @@ def build_training_arguments(config: DictConfig, run_dir: str | Path) -> Trainin
     """Builds TrainingArguments for the HuggingFace Trainer."""
     training_config = config.training
     optimizer_config = config.optimizer
-    adam_betas = list(
-        optimizer_config.adamw_betas
-        if "adamw_betas" in optimizer_config
-        else optimizer_config.betas
-    )
+    adam_betas = list(optimizer_config.get("adamw_betas", optimizer_config.get("betas", [0.9, 0.999])))
     if len(adam_betas) != 2:
         raise ValueError("Optimizer config must define exactly two Adam beta values.")
-    adam_eps = (
-        optimizer_config.adamw_eps
-        if "adamw_eps" in optimizer_config
-        else optimizer_config.eps
-    )
+    adam_eps = optimizer_config.get("adamw_eps", optimizer_config.get("eps", 1e-8))
     output_dir = Path(run_dir) / "trainer_output"
 
     return TrainingArguments(
@@ -192,6 +185,28 @@ def build_muon_trainer(
     )
 
 
+def build_mezo_trainer(
+    config: DictConfig,
+    model: Any,
+    tokenizer: Any,
+    dataset: DatasetDict,
+    run_dir: str | Path,
+) -> Trainer:
+    """Builds the HuggingFace Trainer with the MeZO optimizer path."""
+    training_args = build_training_arguments(config=config, run_dir=run_dir)
+    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+
+    return MeZOTrainer(
+        optimizer_config=config.optimizer,
+        model=model,
+        args=training_args,
+        train_dataset=dataset["train"],
+        eval_dataset=dataset["validation"],
+        data_collator=data_collator,
+        processing_class=tokenizer,
+    )
+
+
 def build_trainer(
     config: DictConfig,
     model: Any,
@@ -211,6 +226,14 @@ def build_trainer(
         )
     if optimizer_name == "muon":
         return build_muon_trainer(
+            config=config,
+            model=model,
+            tokenizer=tokenizer,
+            dataset=dataset,
+            run_dir=run_dir,
+        )
+    if optimizer_name == "mezo":
+        return build_mezo_trainer(
             config=config,
             model=model,
             tokenizer=tokenizer,

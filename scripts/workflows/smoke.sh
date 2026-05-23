@@ -8,7 +8,7 @@ cd "${PROJECT_ROOT}"
 
 HF_REPO_ID="${HF_REPO_ID:-}"
 OPTIMIZER="adamw"
-EXPERIMENT="smoke_adamw_tiny"
+EXPERIMENT=""
 EXTRA_OVERRIDES=()
 
 while [[ $# -gt 0 ]]; do
@@ -51,6 +51,11 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+OPTIMIZER="$(echo "${OPTIMIZER}" | tr '[:upper:]' '[:lower:]')"
+if [[ -z "${EXPERIMENT}" ]]; then
+  EXPERIMENT="smoke_${OPTIMIZER}_tiny"
+fi
 
 HF_ARGS=()
 if [[ -n "${HF_REPO_ID}" ]]; then
