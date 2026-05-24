@@ -100,7 +100,9 @@ def build_training_arguments(config: DictConfig, run_dir: str | Path) -> Trainin
     """Builds TrainingArguments for the HuggingFace Trainer."""
     training_config = config.training
     optimizer_config = config.optimizer
-    adam_betas = list(optimizer_config.get("adamw_betas", optimizer_config.get("betas", [0.9, 0.999])))
+    adam_betas = list(
+        optimizer_config.get("adamw_betas", optimizer_config.get("betas", [0.9, 0.999]))
+    )
     if len(adam_betas) != 2:
         raise ValueError("Optimizer config must define exactly two Adam beta values.")
     adam_eps = optimizer_config.get("adamw_eps", optimizer_config.get("eps", 1e-8))
@@ -326,11 +328,7 @@ def run_training(config: DictConfig, run_dir: str | Path) -> TrainingResult:
     )
 
     resume_from_run_dir = config.training.get("resume_from_run_dir", None)
-    resume_checkpoint = (
-        find_resume_checkpoint(run_dir)
-        if resume_from_run_dir is not None
-        else None
-    )
+    resume_checkpoint = find_resume_checkpoint(run_dir) if resume_from_run_dir is not None else None
     train_output = trainer.train(resume_from_checkpoint=resume_checkpoint)
     training_time_seconds = time.perf_counter() - start_time
     completed_steps = getattr(trainer.state, "global_step", None)
@@ -343,9 +341,7 @@ def run_training(config: DictConfig, run_dir: str | Path) -> TrainingResult:
             ),
             default=0,
         )
-    time_per_step_seconds = (
-        training_time_seconds / completed_steps if completed_steps > 0 else None
-    )
+    time_per_step_seconds = training_time_seconds / completed_steps if completed_steps > 0 else None
 
     checkpoint_paths = save_best_and_last_checkpoints(
         trainer=trainer,
@@ -390,4 +386,15 @@ def run_training(config: DictConfig, run_dir: str | Path) -> TrainingResult:
     model_artifacts["local_path"] = final_paths["model_path"]
     tokenizer_artifacts["local_path"] = final_paths["tokenizer_path"]
     checkpoint_artifacts.update(checkpoint_paths)
+
+    debug_artifacts = artifacts.get("debug", {})
+    if not isinstance(debug_artifacts, dict):
+        raise TypeError("Training result debug artifacts must be a dictionary.")
+    debug_dir = Path(run_dir) / "debug"
+    mezo_debug_steps_path = debug_dir / "mezo_debug_steps.csv"
+    mezo_debug_params_path = debug_dir / "mezo_debug_params.csv"
+    if mezo_debug_steps_path.is_file():
+        debug_artifacts["mezo_debug_steps_path"] = str(mezo_debug_steps_path)
+    if mezo_debug_params_path.is_file():
+        debug_artifacts["mezo_debug_params_path"] = str(mezo_debug_params_path)
     return result

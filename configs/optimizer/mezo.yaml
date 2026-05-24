@@ -1,6 +1,12 @@
 name: mezo
 implementation: custom
-lr: 1e-6
+lr: 1e-7
 weight_decay: 0
 zo_eps: 1e-3
 non_diff: false
+debug_enabled: false
+debug_every: 50
+debug_param_patterns:
+  - model.layers.0.self_attn.q_proj.weight
+  - model.layers.0.mlp.up_proj.weight
+  - model.layers.10.self_attn.o_proj.weight

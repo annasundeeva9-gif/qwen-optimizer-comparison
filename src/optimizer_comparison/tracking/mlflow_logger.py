@@ -40,6 +40,9 @@ def collect_training_params(config: DictConfig) -> dict[str, str]:
         "optimizer.weight_decay": config.get("optimizer", {}).get("weight_decay"),
         "optimizer.betas": config.get("optimizer", {}).get("betas"),
         "optimizer.eps": config.get("optimizer", {}).get("eps"),
+        "optimizer.zo_eps": config.get("optimizer", {}).get("zo_eps"),
+        "optimizer.debug_enabled": config.get("optimizer", {}).get("debug_enabled"),
+        "optimizer.debug_every": config.get("optimizer", {}).get("debug_every"),
         "experiment.name": config.get("experiment", {}).get("name"),
         "data.split.seed": config.get("data", {}).get("split", {}).get("seed"),
         "training.seed": config.get("training", {}).get("seed"),
@@ -98,6 +101,9 @@ def log_training_history(training_result: TrainingResult) -> None:
             value = entry.get(source_name, None)
             if isinstance(value, int | float):
                 mlflow.log_metric(mlflow_name, float(value), step=step)
+        for source_name, value in entry.items():
+            if source_name.startswith("debug/") and isinstance(value, int | float):
+                mlflow.log_metric(source_name, float(value), step=step)
 
 
 def log_hf_hub_tags(training_result: TrainingResult) -> None:
@@ -138,14 +144,21 @@ def log_training_artifacts(config: DictConfig, training_result: TrainingResult) 
 
     plots = artifacts.get("plots", {})
     if not isinstance(plots, dict):
-        return
+        raise TypeError("Training result artifacts.plots must be a dictionary.")
+    debug = artifacts.get("debug", {})
+    if not isinstance(debug, dict):
+        raise TypeError("Training result artifacts.debug must be a dictionary.")
 
-    plot_paths = [
+    artifact_paths = [
         str(path)
-        for path in [plots.get("training_curves_path", None)]
+        for path in [
+            plots.get("training_curves_path", None),
+            debug.get("mezo_debug_steps_path", None),
+            debug.get("mezo_debug_params_path", None),
+        ]
         if path is not None
     ]
-    log_custom_artifacts(config=config, artifact_paths=plot_paths)
+    log_custom_artifacts(config=config, artifact_paths=artifact_paths)
 
 
 def log_training_run(config: DictConfig, training_result: TrainingResult) -> str | None:

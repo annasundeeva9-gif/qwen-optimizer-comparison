@@ -34,6 +34,10 @@ def build_empty_artifacts() -> dict[str, object]:
         "plots": {
             "training_curves_path": None,
         },
+        "debug": {
+            "mezo_debug_steps_path": None,
+            "mezo_debug_params_path": None,
+        },
         "hf_hub": {
             "repo_id": None,
             "artifact_path": None,
