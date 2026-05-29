@@ -1,0 +1,7 @@
+optimizer,lr,train_loss,val_loss,avg_harness_score
+base_qwen,-,-,-,0.5365
+adamw,5e-05,2.8840,2.8622,0.5407
+muon,5e-05,2.8838,2.8640,0.5424
+mezo,1e-06,3.3973,3.6856,0.5441
+mezo,1e-07,3.4656,3.8495,0.5449
+mezo,1e-07,3.4627,3.8441,0.5432

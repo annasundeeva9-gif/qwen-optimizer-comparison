@@ -1,0 +1,6 @@
+optimizer,lr,training_time_seconds,maximum_memory_mb,avg_harness_score,training_convergence
+adamw,5e-05,5156.04,8803.88,0.5407,2.8622
+muon,5e-05,5402.74,8122.34,0.5424,2.8640
+mezo,1e-06,1878.52,48496.29,0.5441,3.6856
+mezo,1e-07,1878.92,48496.29,0.5449,3.8495
+mezo,1e-07,1092.60,3932.57,0.5432,3.8441

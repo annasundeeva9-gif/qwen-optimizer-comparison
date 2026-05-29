@@ -1,0 +1,126 @@
+data:
+  raw:
+    hf_dataset_id: Elriggs/openwebtext-100k
+    hf_dataset_url: https://huggingface.co/datasets/Elriggs/openwebtext-100k
+    hf_split: train
+    text_column: text
+    dir: outputs/datasets/raw/openwebtext_100k
+    save_local: true
+    force_reload: false
+  preprocessing:
+    dir: outputs/datasets/preprocessed/openwebtext_100k
+    save_local: false
+    force_reload: false
+  split:
+    dir: outputs/datasets/split_raw/openwebtext_100k
+    validation_size: 0.05
+    seed: 42
+    save_local: true
+    force_reload: false
+  tokenization:
+    dir: outputs/datasets/tokenized/openwebtext_100k
+    max_length: 1024
+    min_length_tokens: 100
+    num_proc: false
+    save_local: true
+    force_reload: false
+  final:
+    dir: outputs/datasets/final/openwebtext_100k
+    save_local: true
+    force_reload: false
+mode:
+  name: full
+  description: Full remote training run.
+  use_mock_trainer: false
+  smoke_samples_limit: null
+  limit_eval_samples: null
+model:
+  name: qwen_0_5b
+  pretrained_name_or_path: Qwen/Qwen2.5-0.5B
+  tokenizer_name_or_path: Qwen/Qwen2.5-0.5B
+  trust_remote_code: true
+  torch_dtype: bfloat16
+optimizer:
+  name: mezo
+  implementation: custom
+  lr: 1.0e-06
+  weight_decay: 0
+  zo_eps: 0.001
+  non_diff: false
+training:
+  num_train_epochs: 1
+  seed: 42
+  data_seed: 42
+  per_device_train_batch_size: 32
+  per_device_eval_batch_size: 32
+  gradient_accumulation_steps: 1
+  max_steps: 2000
+  logging_strategy: steps
+  logging_steps: 1
+  eval_strategy: steps
+  eval_steps: 250
+  save_strategy: steps
+  save_steps: 250
+  save_total_limit: 3
+  load_best_model_at_end: true
+  metric_for_best_model: eval_loss
+  greater_is_better: false
+  use_gradient_checkpointing: false
+  bf16: true
+  fp16: false
+  dataloader_num_workers: 4
+  remove_unused_columns: false
+  report_to: []
+  resume_from_run_dir: null
+  lr_scheduler_type: constant
+  warmup_ratio: 0
+  max_grad_norm: 0.0
+  checkpoints:
+    best_dir_name: best
+    last_dir_name: last
+evaluation:
+  harness:
+    tasks:
+    - piqa
+    - arc_easy
+    - arc_challenge
+    - winogrande
+    - hellaswag
+    batch_size: 8
+    output_path: outputs/eval/lm_eval_results.json
+    raw_log_path: outputs/eval/lm_eval_stdout.txt
+    result_filename: evaluation_result.json
+  source:
+    use_base_model: false
+    use_hf_hub: false
+    run_dir: null
+    model_path: null
+    tokenizer_path: null
+    repo_id: null
+    repo_path: null
+    revision: null
+    token_env_var: HF_TOKEN
+    download_dir: outputs/eval/hf_artifacts
+tracking:
+  enabled: true
+  tracking_uri: outputs/mlruns
+  experiment_name: optimizer-comparison
+  log_artifacts: true
+experiment:
+  name: mezo_baseline
+  description: Full run with Qwen2.5-0.5B and MeZO.
+  tags:
+    stage: full
+    optimizer: mezo
+    model: qwen_0_5b
+project:
+  name: optimizer-comparison
+artifacts:
+  root_dir: outputs/runs
+  config_filename: config.yaml
+  result_filename: result.json
+  cleanup_checkpoints_after_hf_upload: true
+  hf_hub:
+    use: true
+    repo_id: NShun9/optimizer-comparison-artifacts
+    token_env_var: HF_TOKEN
